@@ -43,6 +43,9 @@ This project was created to gather github public repo network
 
 
 
+
+forks_count in repo request can be used to find the forked repos
+
 	
 
 ## analysis ideas

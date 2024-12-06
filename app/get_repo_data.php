@@ -4,72 +4,25 @@
 require_once 'c:/php/vendor/autoload.php';
 use Curl\Curl;
 
+//initialize the loop counter variable for organizations
+$org_loop_counter = 0;
+
+//initialize the loop counter variable for repos
+$repo_loop_counter = 0;
+
+$debug_path = "C:/Users/Jesse/Documents/Version Control/network_science_data_gathering/app/debug/";
 
 
 //send the curl request for the organizations:
-if (curl_request('https://api.github.com/organizations?per_page=100', $curl_response))
+if (org_request_loop('https://api.github.com/organizations?per_page=100'))
 {
-
-
-	echo "The return value is: \n";
-
-	echo $curl_response;
-
-	if (preg_match($pattern='/link\:.+\<(.+)\>; rel="next",/', $curl_response, $matches))
-	{
-		echo "the next URL link was found\n";
-		
-		
-
-	//	echo var_export($matches, true);
-
-		$next_url = $matches[1];
-		
-		echo "The value of \$next_url is: ".$next_url."\n";
-		
-
-
-//		echo "the value of \$curl_response is: ".$curl_response."\n";
-		
-		//parse the content part of the data:
-		
-		if (preg_match('/(\[.+\])/s', $curl_response, $matches))
-		{
-			echo "the value of matches is: ".var_export($matches, true)."\n";
+	//the loop executed successfully:
+	
+	echo "the org_request_loop completed successfully\n";
 
 
 
-			//convert the json content to a json object:
-			$json_data = json_decode($matches[1]);
 
-			//loop through the json data and parse the 
-
-
-			echo "print the json object data:\n";
-			echo var_export($json_data, true)."\n";
-		}
-		else
-		{
-			echo "The json object content parsing was unsuccessful\n";
-			
-		}
-		
-		
-		
-		
-		
-		//request the next link value:
-		
-		
-
-		
-	}
-	else
-	{
-		echo "The json header content parsing was unsuccessful\n";
-
-		
-	}
 }
 else
 {
@@ -77,22 +30,6 @@ else
 
 	
 }
-
-//parse this:
-
-	//link: <https://api.github.com/organizations?per_page=100&page=1&since=8335>; rel="next", <https://api.github.com/organizations{?since}>; rel="first"
-
-
-
-
-
-//parse the object enclosed by [], substring the data and then convert to json object
-
-
-
-//echo "page 2\n";
-//curl_request('https://api.github.com/organizations?per_page=100&page=1');
-
 
 
 function curl_request($url, &$curl_response)
@@ -114,20 +51,203 @@ function curl_request($url, &$curl_response)
 }
 
 
-
-//this function requests the organizations in the GitHub network
-function org_request ()
+function parse_json_from_api ($json_content, &$json_object, &$next_link_url)
 {
+	echo "running parse_json_from_api (\$json_content, &\$json_object, &\$next_link_url)\n";
 	
+	$return_value = true;
+
+//	if (preg_match($pattern='/link\:.+\<(.+)\>; rel="next",.+(\[.+\])/s', $json_content, $matches))	//regexp to get both the next link and the json content
+	if (!($next_link_found = preg_match($pattern='/link\:.+\<(.+)\>; rel="next",/s', $json_content, $matches)))
+	{
+		//the next link was not found
+		echo "The next link was not found\n";
+		$next_link_url = null;
+	}
+	else	//the next link was found
+		$next_link_url = $matches[1];
+
+
+	echo "The value of \$next_link_url is: ".$next_link_url."\n";
+
 	
-	
-	
-	
+	//parse the content part of the data:
+	if (preg_match('/(\[.+\])/s', $json_content, $matches))
+	{
+//			echo "the value of matches is: ".var_export($matches, true)."\n";
+
+		//convert the json content to a json object:
+		$json_object = json_decode($matches[1], true);
+	}
+	else
+	{
+		echo "The json object content parsing was unsuccessful\n";
+		$return_value = false;
+		
+	}
+	return $return_value;
 }
 
 
-function org_repo_request()
+
+//this function requests the organizations in the GitHub network
+function org_request_loop ($request_url)
 {
+	echo "running org_request_loop ($request_url)\n";
+
+	$return_value = true;
+	
+	//increment the organization loop counter to stop the script before it loops too many times
+	$GLOBALS['org_loop_counter']++;
+	
+	echo "The value of \$GLOBALS['org_loop_counter'] is: ".$GLOBALS['org_loop_counter']."\n";
+	
+	if ($GLOBALS['org_loop_counter'] > 2)
+	{
+		echo "The org_loop_counter is above 2, exit the program\n";
+		exit;
+	
+	}
+	
+	//send the curl request for the organizations:
+	if (curl_request($request_url, $curl_response))
+	{
+
+//		echo $curl_response;
+		file_put_contents($GLOBALS['debug_path']."org_".$GLOBALS['org_loop_counter'].".txt", $curl_response);
+
+		//parse the json
+		if (parse_json_from_api ($curl_response, $json_object, $next_link_url))
+		{
+			//the org json data was parsed successfully
+			
+			
+			//loop through the organizations
+			
+			for ($i = 0; $i < count($json_object) && $i < 3; $i ++)
+//			for ($i = 0; $i < count($json_object); $i ++)
+			{
+				echo "The value of the current organization is: ".var_export($json_object[$i], true)."\n";
+
+				//query for the owner record by owner_id and org_owner values, if it
+					//if so then retrieve the id so it can be used for inserting repo data
+					//if not then insert the owner record and return the id
+
+				//set this as the pk id
+				$owner_id = null;
+				
+
+				//request all the repos associated with the org:
+				$return_value = repo_request_loop("https://api.github.com/orgs/".$json_object[$i]['id']."/repos?per_page=100&page=1", $owner_id, true);
+				
+			}
+			
+
+			if (!empty($next_link_url))
+			{
+				//the next link is defined, recursively call org_request_loop with the $next_link_url
+				$return_value = org_request_loop ($next_link_url);
+			}			
+		}
+		else
+		{
+			echo "The json header content parsing was unsuccessful\n";
+			$return_value = false;
+			
+		}
+	}
+	else
+	{
+		echo "The curl request was unsuccessful\n";
+		$return_value = false;
+	}
+
+	return $return_value;
+	
+}
+
+//recursive function that loops through the repos for a given org or user identified by id and type
+function repo_request_loop($request_url, $owner_id, $org_owner = true)
+{
+	echo "running repo_request_loop ($request_url, $owner_id, $org_owner)\n";
+
+	$return_value = true;
+	
+	//increment the repo loop counter to stop the script before it loops too many times
+	$GLOBALS['repo_loop_counter']++;
+	
+	echo "The value of \$GLOBALS['repo_loop_counter'] is: ".$GLOBALS['repo_loop_counter']."\n";
+	
+/*	if ($GLOBALS['repo_loop_counter'] > 2)
+	{
+		exit;
+	}	
+*/	
+	//send the curl request for the repos:
+	if (curl_request($request_url, $curl_response))
+	{
+
+//		echo "The return value is: \n";
+
+//		echo $curl_response;
+
+//		echo $curl_response;
+		file_put_contents($GLOBALS['debug_path']."repo_".$GLOBALS['repo_loop_counter'].".txt", $curl_response);
+
+		//parse the repo json content
+		if (parse_json_from_api ($curl_response, $json_object, $next_link_url))
+		{
+			//the org json data was parsed successfully
+			
+			
+			//loop through the repos
+//			for ($i = 0; $i < 5; $i ++)
+			for ($i = 0; $i < count($json_object); $i ++)
+			{
+//				echo "The value of the current repo is: ".var_export($json_object[$i], true)."\n";
+				
+				echo "The value of the current repo is: ".$json_object[$i]['full_name']."\n";
+
+				//check if the repo exists in the DB based on the parsed id value
+					//if it exists, do not insert it
+					//if it does not exist, insert it
+					
+					
+					
+					
+				//check if there are any forks for the current repo:
+				if ($json_object[$i]['forks_count'] > 0)
+				{
+					//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
+					echo "This repo has more than one link: ".$json_object[$i]['forks_count']."\n";
+				}
+			}
+			
+			
+			echo "The repo_request_loop has finished the current iteration\n";
+
+			if (!empty($next_link_url))
+			{
+				//the next link is defined, recursively call repo_request_loop with the $next_link_url
+
+				//request the next page of the list so it can be processed:
+				//$return_value = repo_request_loop ($next_link_url, $owner_id, $org_owner);
+			}			
+		}
+		else
+		{
+			echo "The json header content parsing was unsuccessful\n";
+			$return_value = false;
+			
+		}
+	}
+	else
+	{
+		echo "The curl request was unsuccessful\n";
+		$return_value = false;
+	}
+
+	return $return_value;
 	
 	
 	
