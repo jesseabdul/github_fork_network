@@ -43,6 +43,9 @@ This project was created to gather github public repo network
 
 
 
+processing:
+ 	when processing the forks, owner_id will not be defined and it will need to be parsed from the json
+
 
 forks_count in repo request can be used to find the forked repos
 
@@ -57,3 +60,18 @@ R: calculate all metrics for the network and compare to random networks to deter
 
 Gephi: visualize with standard method
 
+
+
+
+to do:
+	_ implement for users
+
+
+	_ implement for forks
+		_ current repo is fork
+		_ current repo has forks
+		
+	_ generate the network file (graphml, gml, or other with properties)
+
+
+	

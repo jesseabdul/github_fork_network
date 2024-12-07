@@ -12,6 +12,9 @@ $repo_loop_counter = 0;
 
 $debug_path = "C:/Users/Jesse/Documents/Version Control/network_science_data_gathering/app/debug/";
 
+//connect to mysql with PDO
+connect_mysql ($pdo);
+
 
 //send the curl request for the organizations:
 if (org_request_loop('https://api.github.com/organizations?per_page=100'))
@@ -39,6 +42,13 @@ function curl_request($url, &$curl_response)
 
 	$curl->setOpt(CURLOPT_SSL_VERIFYPEER , false);
 	$curl->setOpt(CURLOPT_HEADER, true);
+	$headers = [
+    'Authorization: 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',
+    "X-GitHub-Api-Version: 2022-11-28"
+	];
+	
+	$curl->setopt(CURLOPT_HTTPHEADER, $headers);
+
 	$curl->get($url);
 
 	if ($curl->error) {
@@ -130,11 +140,17 @@ function org_request_loop ($request_url)
 				echo "The value of the current organization is: ".var_export($json_object[$i], true)."\n";
 
 				//query for the owner record by owner_id and org_owner values, if it
-					//if so then retrieve the id so it can be used for inserting repo data
-					//if not then insert the owner record and return the id
+				if (!owner_exists($json_object[$i]['id'], $owner_type = 'Organization', $owner_id))
+				{
+					//the owner doesn't exist, insert the owner record
 
-				//set this as the pk id
-				$owner_id = null;
+					echo "the owner doesn't exist, insert the owner record\n";
+
+					if (insert_owner ($json_object[$i], $owner_type, $owner_id))
+					{
+						echo "the owner was inserted successfully\n";
+					}
+				}
 				
 
 				//request all the repos associated with the org:
@@ -170,6 +186,9 @@ function org_request_loop ($request_url)
 function repo_request_loop($request_url, $owner_id, $org_owner = true)
 {
 	echo "running repo_request_loop ($request_url, $owner_id, $org_owner)\n";
+
+	//debugging statement
+//	return true;
 
 	$return_value = true;
 	
@@ -211,15 +230,74 @@ function repo_request_loop($request_url, $owner_id, $org_owner = true)
 				//check if the repo exists in the DB based on the parsed id value
 					//if it exists, do not insert it
 					//if it does not exist, insert it
+				
+				if (!repo_exists($json_object[$i]['id'], $repo_id))
+				{
+					echo "The repo does not already exist, insert it\n";
+
+					//the repo does not exist, insert it now:
+					if (insert_repo($json_object[$i], $owner_id, $repo_id))
+					{
+						echo "The repo was inserted successfully\n";
+						
+						
+					}
+					else
+						echo "Error - The repo was NOT inserted successfully\n";
+
+
+				}
+
+
+				//check if the current repo is a fork, if so query for the repo it was forked from and insert the current repo with fork_repo_id:
+				
+				if ($json_object[$i]['fork'])
+				{
+					//the current repository is a forked repository, get the information from the "parent" property
+					echo "the current repository is a forked repository, get the information from the fork url\n";
+
+
+					//request the current repository information:
+					//https://api.github.com/repos/[owner]/[repo]
+						//parse the parent object to get the owner and the repo
+					
+						
+					
+
+					//check if the owner exists in the database, if not insert it
+					if (owner_exists($json_object[$i]['parent']['']
+
+
+
+					//check if the parent repo exists in the database, if not insert it
+						//insert/retrieve the repo_id and use the repo_id for the current repo's fork_repo_id value
+					
+					
+					//insert/retrieve the owner information (this is an interesting owner if it has repos that have been forked)
+						//process the repos for the single owner using the repo_request_loop() function
+						
 					
 					
 					
 					
+					
+				}
+				
+				
+					//use the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo data:
+
+
 				//check if there are any forks for the current repo:
 				if ($json_object[$i]['forks_count'] > 0)
 				{
 					//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
 					echo "This repo has more than one link: ".$json_object[$i]['forks_count']."\n";
+					
+					
+					//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo data:
+					
+					
+					
 				}
 			}
 			
@@ -231,7 +309,7 @@ function repo_request_loop($request_url, $owner_id, $org_owner = true)
 				//the next link is defined, recursively call repo_request_loop with the $next_link_url
 
 				//request the next page of the list so it can be processed:
-				//$return_value = repo_request_loop ($next_link_url, $owner_id, $org_owner);
+				$return_value = repo_request_loop ($next_link_url, $owner_id, $org_owner);
 			}			
 		}
 		else
@@ -254,7 +332,7 @@ function repo_request_loop($request_url, $owner_id, $org_owner = true)
 }
 
 
-function user_request ()
+function user_request_loop ()
 {
 	
 	
@@ -262,13 +340,174 @@ function user_request ()
 }
 
 
-function user_repo_request()
+function insert_owner ($owner_info, $owner_type, &$owner_id)
 {
-	
-	
-	
+	echo "running insert_owner(".var_export($owner_info, true).", \$owner_id)\n";
+
+	$query = "insert into github_network.ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
+
+	echo "the value of \$query is: $query\n";
+
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+	$stmt->bindValue(":source_owner_id", $owner_info['id']);
+	$stmt->bindValue(":login", $owner_info['login']);
+	$stmt->bindValue(":html_url", "https://github.com/".$owner_info['login']);
+	$stmt->bindValue(":owner_type", $owner_type);
+
+
+	if ($stmt->execute())
+	{
+		//the insert query was successful
+		echo "the insert query was successful\n";
+
+		//return the owner_id value so it can be used for processing the data
+
+		//commit the transaction
+//        $GLOBALS['pdo']->commit();
+
+		$owner_id = $GLOBALS['pdo']->lastInsertId();
+		
+		echo "the auto insert value is: ".$owner_id."\n";
+		return true;
+	}
+	else
+		return false;
+
 }
 
+//function to query the database to see if the owner record exists:
+function owner_exists($source_owner_id, $owner_type, &$owner_id)
+{
+	//initialize the value of $owner_id
+	$owner_id = null;
+
+	echo "running owner_exists($source_owner_id, $owner_type, \$owner_id)\n";
+	
+	$query = "select owner_id from github_network.ghnd_owners where source_owner_id = :source_owner_id and owner_type = :owner_type";
+	
+	echo "the value of \$query is: $query\n";
+	
+	
+
+	// prepare the statement. the placeholders allow PDO to handle substituting
+	// the values, which also prevents SQL injection
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+	// bind the parameters
+	$stmt->bindValue(":source_owner_id", $source_owner_id);
+	$stmt->bindValue(":owner_type", $owner_type);
+
+	$stmt->execute();
+	if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+		$owner_id = $row['owner_id'];
+	}	
+
+	//return true if the owner record exists and false if the owner record does not exist:
+
+
+	echo "the value of owner_exists() is: ".(!is_null($owner_id))."\n";
+
+	return (!is_null($owner_id));
+}
+
+
+
+
+
+function insert_repo ($repo_info, $owner_id, &$repo_id)
+{
+	echo "running insert_repo(".var_export($repo_info, true).", \$repo_id)\n";
+
+	$query = "insert into github_network.ghnd_repos (source_repo_id, fork_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id) VALUES (:source_repo_id, :fork_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id)";
+
+	echo "the value of \$query is: $query\n";
+
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+	$stmt->bindValue(":source_repo_id", $repo_info['id']);
+
+
+
+	//**Fill this in later when the forking is implemented (both ways)
+	$stmt->bindValue(":fork_repo_id", null);
+
+	//fill this in once the topics parsing is implemented
+	$stmt->bindValue(":topics", null);
+
+	$stmt->bindValue(":repo_name", $repo_info['name']);
+	$stmt->bindValue(":full_name", $repo_info['full_name']);
+	$stmt->bindValue(":repo_url", $repo_info['html_url']);
+	$stmt->bindValue(":created_at", $repo_info['created_at']);
+	$stmt->bindValue(":updated_at", $repo_info['updated_at']);
+	$stmt->bindValue(":owner_id", $owner_id);
+
+	if ($stmt->execute())
+	{
+		//the insert query was successful
+		echo "the insert query was successful\n";
+
+		//return the repo_id value so it can be used for processing the data
+
+		//commit the transaction
+//        $GLOBALS['pdo']->commit();
+
+		$repo_id = $GLOBALS['pdo']->lastInsertId();
+		
+		echo "the auto insert value is: ".$repo_id."\n";
+		return true;
+	}
+	else
+		return false;
+
+}
+
+//function to query the database to see if the repo record exists:
+function repo_exists($source_repo_id, &$repo_id)
+{
+	//initialize the value of $repo_id
+	$repo_id = null;
+	
+	echo "running repo_exists($source_repo_id, \$repo_id)\n";
+	
+	$query = "select repo_id from github_network.ghnd_repos where source_repo_id = :source_repo_id";
+	
+	echo "the value of \$query is: $query\n";
+	
+	
+
+	// prepare the statement. the placeholders allow PDO to handle substituting
+	// the values, which also prevents SQL injection
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+	// bind the parameters
+	$stmt->bindValue(":source_repo_id", $source_repo_id);
+
+	$stmt->execute();
+	if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+		$repo_id = $row['repo_id'];
+	}	
+
+	//return true if the repo record exists and false if the repo record does not exist:
+
+
+	echo "the value of repo_exists() is: ".(!is_null($repo_id))."\n";
+
+	return (!is_null($repo_id));
+}
+
+
+function connect_mysql (&$pdo)
+{
+	// connect to PDO
+	$pdo = new PDO("mysql:host=localhost;dbname=github_network", "github_dev", "myadm1n");
+
+	// the following tells PDO we want it to throw Exceptions for every error.
+	// this is far more useful than the default mode of throwing php errors
+	$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+	
+}
 
 
 //algorithm:
