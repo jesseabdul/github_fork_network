@@ -73,5 +73,47 @@ to do:
 		
 	_ generate the network file (graphml, gml, or other with properties)
 
-
+	_ implement transactions for the repo commits
+		as long as the repo is successfully inserted then commit
+		
+		
+		
+		
+		
+	have a value in the DB with the last url used for users/orgs?
+		so it can pick up where it left off?
+		
+	_ change the timeout setting to make it long or remove it
 	
+	_ rename all of the json files that are saved on the server (for debugging).  Have them all use the ID so we don't use the global variable and we can know what GH recs each one corresponds to.
+	
+	
+	
+	_ ** implement the checks in repo_request_loop() for when the owner type and id are null
+	
+	in the algorithm check if the repo exists before doing anything with the owner ->
+		_ ** need to ensure that we use SQL transactions to make sure that when a repo is created and saved that all of its associated records also exist (forks, parents) so that we know we can ignore them
+		if (repo_exists())
+		{
+			//the repo already exists, do nothing
+		
+		
+		}
+		else
+		{
+			//check if owner exists:
+			
+			if (owner_exists())
+			{
+				//use the owner_id
+			
+			}
+			else
+			{
+				//create the owner 
+			
+			}
+		
+			create the repository
+		
+		}
