@@ -212,14 +212,11 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 					//the current repo does not already exist, process it
 					echo "the current repo does not already exist, process it\n";
 
-					//initialize the variable:
-					$parent_repo_id = null;
-
 					//check if the current repo is a fork, if so query for the repo it was forked from and insert the current repo with fork_repo_id:
 					echo "check if the current repo is a fork\n";
 
-
-					if ($json_object[$i]['fork'])
+					//check if the parent_repo_id is not defined and the current repository is a fork 
+					if ((is_null($parent_repo_id)) && ($json_object[$i]['fork']))
 					{
 						//the current repository is a forked repository, get the information from the "parent" property
 						echo "the current repository is a forked repository, get the information from the fork url\n";
@@ -317,15 +314,14 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 
 					//the repo does not exist, insert it now:
 					
-					//we need to include the $parent_repo_id if there is one when we insert this record
-					$json_object[$i]['parent_repo_id'] = $parent_repo_id;
 
 					
-					
-					//process the owner first, then insert the repo:
-					if (process_owner ($json_object[$i]['owner'], $owner_id))
+					if ((!is_null($owner_id)) || (process_owner ($json_object[$i]['owner'], $owner_id)))
 					{
-						//the repo owner record was processed successfully
+
+						//we need to include the $parent_repo_id if there is one when we insert this record
+						$json_object[$i]['parent_repo_id'] = $parent_repo_id;
+					
 
 						//insert the repo
 						if (insert_repo($json_object[$i], $owner_id, $repo_id))
@@ -356,7 +352,6 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 						return false;
 					
 					}
-
 					
 					//use the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo data:
 

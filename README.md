@@ -89,6 +89,79 @@ to do:
 	
 	
 	
+	
+	Algorithm overview:
+		request the owners and loop through each of them (org or user)
+			request the list of repositories for the current owner
+				process each of the repositories
+					if the repo already exists in the DB, do nothing
+					If the repo does not already exist:
+						If the repo is a forked repo:
+							
+							
+							request the detailed repo info and process the parent repository 
+							if the parent repo exists then use the repo_id as the parent_repo_id for the current repo
+							If the parent report does not exist in the DB then insert the parent repo and the parent repo owner (if they don't already exist)
+								****Check if the parent repository has a parent (fork: true)****
+									//do this recursively, keep following the parent repo until there is no parent
+										each time a new parent is found do the same recursive loop for the parent's owner repositories
+										There is no need to check the 
+										
+										//**check for all other forks from the parent repository
+											//use the fork url to process this
+										
+										
+
+								Use the new repo_id as the parent_repo_id of the current owner repo in the processing loop
+							
+							process all of the parent repo owner's repos using repo_request_loop()
+						
+						process the current repo
+							The owner_id is specified so each repo will be associated with the owner
+							If the owner_id is not specified it will attempt to determine if the owner record exists and retrieve the owner_id and if the record doesn't exist it will insert the owner rec
+							
+							Insert the repo record with the parent_repo_id (if any)
+							
+						Check if the current repo has any forks
+							if so, loop through all the forks using the fork request URL by calling the repo_request_loop with the current repo_id as the parent_repo_id parameter value
+							
+
+				If there was a next page link recursively call repo_request_loop() to process the next page for the current organization/fork list
+
+
+
+
+
+_ implement separate functions for each of the types of processing needed in each case
+	recursive function for processing parent repo and parent owner's repos
+		end condition will be fork = false
+		
+	
+
+	
+	
+	main recursive function for repo processing:
+		Use the different arguments to determine if certain checks should be run (e.g. owner_id, parent_repo_id)
+		
+	function - process the current repo
+		
+	fork processing:
+		find the fork url and call the repo_request_loop() with parent_repo_id = repo_id
+		
+	
+		
+	
+	
+** think about how to ensure that transactions are implemented properly and that the process can be resumed where it left off and no partial transactions are committed due to a rate limit or processing error	
+	
+	
+								
+							
+						
+						
+	
+	
+	
 	_ ** implement the checks in repo_request_loop() for when the owner type and id are null
 	
 	in the algorithm check if the repo exists before doing anything with the owner ->
@@ -122,10 +195,21 @@ to do:
 				//look at parent fork (if parent_repo_id is not defined)
 					do not pass in the owner_id parameter for these requests so the function determines the owner id, return the parent_repo_id so it can be used when inserting the current repo that is being processed:
 					
+					
+					//check if the parent repo is a fork (recursive function call?)
+						//we want to check if the parent has a parent
+							//if not, then finish processing the current parent repo normally
+							//if so, then 
+					
+					
 					//process the parent owner's repos (repo_request_loop)
 					
 					//pass in owner_id = null
 					//pass in parent_repo_id = null
+					
+					
+					
+					
 					
 
 				//process the current repo:
