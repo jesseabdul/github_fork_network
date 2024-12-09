@@ -5,8 +5,12 @@ require_once 'c:/php/vendor/autoload.php';
 use Curl\Curl;
 
 
+
+$api_request_counter = 0;
+
 function curl_request($url, &$curl_response)
 {
+	
 	
 	$curl = new Curl();
 
@@ -22,6 +26,10 @@ function curl_request($url, &$curl_response)
 	} else {
 		$curl_response = $curl->response;
 	}
+
+	
+	echo "This was the ".($GLOBALS['api_request_counter']++)." api request so far\n";
+	
 	return (!$curl->error);
 }
 
@@ -98,6 +106,9 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 		{
 			//the org json data was parsed successfully
 			
+			//release the long json string variable from memory
+			unset($curl_response);
+
 			
 			//loop through the owners
 			
@@ -196,7 +207,12 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 		{
 			//the repo json data was parsed successfully
 			
-			echo "the repo json data was parsed successfully\n";
+			echo "the repo json data was parsed successfully, there are ".count($json_object)." repos returned by the json\n";
+			
+			
+			//release the long json string variable from memory
+			unset($curl_response);
+
 			
 			//loop through the repos
 			for ($i = 0; $i < count($json_object); $i ++)
@@ -207,7 +223,9 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 				{
 					//the current repo was processed successfully
 					
-					echo "the current repo (".$json_object[$i]['name'].") was processed successfully\n";
+					echo "the current repo was processed successfully\n";
+					
+
 				}
 				else
 				{
@@ -225,6 +243,8 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 			if (!empty($next_link_url))
 			{
 				//the next link is defined, recursively call repo_request_loop with the $next_link_url
+
+				echo "the next link is defined, recursively call repo_request_loop with the $next_link_url\n";
 
 				//request the next page of the list so it can be processed:
 				if (!repo_request_loop ($next_link_url, $owner_id, $parent_repo_id))
@@ -263,7 +283,7 @@ function insert_owner ($owner_info, &$owner_id)
 
 	$query = "insert into github_network.ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
 
-	echo "the value of \$query is: $query\n";
+//	echo "the value of \$query is: $query\n";
 
 	$stmt = $GLOBALS['pdo']->prepare($query);
 
@@ -284,7 +304,7 @@ function insert_owner ($owner_info, &$owner_id)
 
 		$owner_id = $GLOBALS['pdo']->lastInsertId();
 		
-		echo "the auto insert value is: ".$owner_id."\n";
+//		echo "the auto insert value is: ".$owner_id."\n";
 		return true;
 	}
 	else
@@ -305,7 +325,7 @@ function owner_exists($owner_info, &$owner_id)
 	
 	$query = "select owner_id from github_network.ghnd_owners where source_owner_id = :source_owner_id and owner_type = :owner_type";
 	
-	echo "the value of \$query is: $query\n";
+//	echo "the value of \$query is: $query\n";
 	
 	
 
@@ -356,7 +376,7 @@ function insert_repo ($repo_info, $owner_id, &$repo_id)
 
 	$query = "insert into github_network.ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
 
-	echo "the value of \$query is: $query\n";
+//	echo "the value of \$query is: $query\n";
 
 	$stmt = $GLOBALS['pdo']->prepare($query);
 
@@ -409,7 +429,7 @@ function repo_exists($repo_info, &$repo_id)
 	
 	$query = "select repo_id from github_network.ghnd_repos where source_repo_id = :source_repo_id";
 	
-	echo "the value of \$query is: $query\n";
+//	echo "the value of \$query is: $query\n";
 
 	// prepare the statement. the placeholders allow PDO to handle substituting
 	// the values, which also prevents SQL injection
@@ -578,7 +598,7 @@ function process_owner_record ($owner_info, &$owner_id)
 //$repo_id contains the repo_id value from the DB for the $repo_info (either an existing record or a newly created record)
 //$owner_id contains the owner_id value from the DB for the repository owner (this will be defined for owner processing loops and null for all others)
 //$parent_repo_id contains the parent_repo_id for the 
-function process_repo ($repo_info, &$repo_id, $owner_id = null, $parent_repo_id = null)
+function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id = null)
 {
 	echo "running process_repo (".$repo_info['id'].", $owner_id, $parent_repo_id)\n";
 	
@@ -623,8 +643,10 @@ function process_repo ($repo_info, &$repo_id, $owner_id = null, $parent_repo_id 
 				{
 					//the json response was parsed successfully
 
-					echo "The value of \$single_repo_json_object is: " . var_export($single_repo_json_object, true)."\n";
+//					echo "The value of \$single_repo_json_object is: " . var_export($single_repo_json_object, true)."\n";
 
+					//release the long json string variable from memory
+					unset($single_repo_curl_response);
 					
 					echo "The parent repository name is: ".$single_repo_json_object['parent']['name']."\n";
 
@@ -780,7 +802,7 @@ function process_repo ($repo_info, &$repo_id, $owner_id = null, $parent_repo_id 
 		if ($repo_info['forks_count'] > 0)
 		{
 			//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
-			echo "This repo has more than one fork: ".$repo_info['forks_count']."\n";
+			echo "This repo has at least one fork: ".$repo_info['forks_count']."\n";
 			
 			
 			//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo's fork data:
@@ -817,7 +839,10 @@ function process_repo ($repo_info, &$repo_id, $owner_id = null, $parent_repo_id 
 	{
 		//The repo already exists, do nothing
 		echo "The repo already exists, do nothing\n";
-	}	
+	}
+
+	//release the json array from memory
+	$repo_info = null;
 	
 	return $return_value;
 	
