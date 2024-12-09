@@ -101,8 +101,10 @@ function parse_json_from_api ($json_content, &$json_object, &$next_link_url)
 	echo "The value of \$next_link_url is: ".$next_link_url."\n";
 
 	
+	
+	
 	//parse the content part of the data:
-	if (preg_match('/(\[.+\])/s', $json_content, $matches))
+	if (preg_match('/\R\R(.+)/s', $json_content, $matches))
 	{
 //			echo "the value of matches is: ".var_export($matches, true)."\n";
 
@@ -297,13 +299,13 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 								echo "The value of \$parent_json_object is: " . var_export($parent_json_object, true)."\n";
 
 								
-								echo "The parent repository name is: ".$parent_json_object[0]['parent']['name']."\n";
+								echo "The parent repository name is: ".$parent_json_object['parent']['name']."\n";
 
-								echo "The parent name is: ".$parent_json_object[$i][0]['owner']['login']."\n";
+								echo "The parent name is: ".$parent_json_object['owner']['login']."\n";
 								
 
 								//process the current parent repo:
-								if (process_repo($parent_json_object[0]['parent'], $parent_owner_id = null, $parent_repo_id))
+								if (process_repo($parent_json_object['parent'], $parent_owner_id = null, $parent_repo_id))
 								{
 									//the parent repo was processed successfully:
 									echo "the parent repo was processed successfully\n";
@@ -324,7 +326,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 								echo "process all of the parent repo's owner's repos\n";
 								
 								//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
-								if (repo_request_loop ($parent_json_object[0]['parent']['owner']['repos_url']."?per_page=100", $parent_owner_id))
+								if (repo_request_loop ($parent_json_object['parent']['owner']['repos_url']."?per_page=100", $parent_owner_id))
 								{
 									//the parent repo's owner repo request loop was successful
 									echo "the parent repo's owner repo request loop was successful\n";
