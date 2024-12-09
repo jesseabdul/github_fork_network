@@ -77,7 +77,7 @@ to do:
 		as long as the repo is successfully inserted then commit
 		
 		
-		
+	_ using https://github.com/php-curl-class/php-curl-class
 		
 		
 	have a value in the DB with the last url used for users/orgs?
