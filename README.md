@@ -93,27 +93,111 @@ to do:
 	
 	in the algorithm check if the repo exists before doing anything with the owner ->
 		_ ** need to ensure that we use SQL transactions to make sure that when a repo is created and saved that all of its associated records also exist (forks, parents) so that we know we can ignore them
-		if (repo_exists())
-		{
-			//the repo already exists, do nothing
 		
 		
-		}
-		else
-		{
-			//check if owner exists:
+		// if parent_repo_id is defined we know this is a fork repo processing loop
+		// if the owner_id is defined then we know this is an owner repo processing loop
+		// if both are blank then this is a parent repo processing loop
+		
+		// both should not be defined since these are mutually exclusive types of executions
+		
 			
-			if (owner_exists())
+
+
+
+		repo_request_loop:
+		
+		
+			
+			
+			if (repo_exists())
 			{
-				//use the owner_id
+				//the repo already exists, do nothing
+			
 			
 			}
 			else
 			{
-				//create the owner 
+
+				//look at parent fork (if parent_repo_id is not defined)
+					do not pass in the owner_id parameter for these requests so the function determines the owner id, return the parent_repo_id so it can be used when inserting the current repo that is being processed:
+					
+					//process the parent owner's repos (repo_request_loop)
+					
+					//pass in owner_id = null
+					//pass in parent_repo_id = null
+					
+
+				//process the current repo:
+					//check if the owner_id parameter is defined, if not use the owner object within the repo object to process the owner
+					
+					//use the parent_repo_id (if defined) when inserting the current repo
+					
+				//process the forks (if any)
+					//use the repo_id as the parent_repo_id for all of the child repos
+					
+					//process the child repos (repo_request_loop)
+					
+					//pass in owner_id = null
+					//pass in parent_repo_id = repo_id
+				
+				
+				
+				//if there are no errors then commit the transaction 
+
+
+				
+
 			
 			}
+			
 		
-			create the repository
+		when we call repo_request_loop() on an owner with the owner's repos we know the owner_id so we can just pass it in to the process_repo function
+			this also applies to each subsequent recursive call on the owner's repos
+
+		when we call repo_request_loop on a fork's parent pass in owner_id = NULL because we don't know what the parent repo's owner is
 		
-		}
+		when we call repo_request_loop on a repo's forks we pass in owner_id = NULL because we don't know what the forked repos' owners are 
+		
+	
+	//do we specify the type value in the $owner_info if it doesn't already exist?
+		YES, instead of adding a new variable as an argument
+		
+	
+	
+	create a new function to handle repo records (supply the $repo_info and $owner_info)
+		if the record exists then return the $repo_id
+		if the record does not exist 
+			_ create a new function to handle owner records (supply just the $owner_info and $owner_id reference variable
+				if the record exists then return the $owner_id 
+				if the record does not exist then insert it and return the owner_id
+			then insert the repo record and return the $repo_id
+			
+			
+	for each fork should we also loop through each repo from each child repo's owner?
+		yes
+		
+	for each parent fork should we also loop through each repo from the parent repo's owner
+		yes
+		
+	if each repo's owner's repos are all in the DB there is no reason to reprocess the 
+		**_ need to make sure that the transactions are implemented this way
+	
+	
+		
+	owner_request_loop() will loop through each repo that belongs to the owner and process each with repo_request_loop()
+		supply the owner_id to the repo_request_loop so it does not need to query for each 
+	
+	_ do we have a different function for the fork request loop?
+		The only difference is that the owner_id is not known because it can vary (specify null for owner_id, and owner_type
+		
+	_ do we have a different function for the fork parent request?
+		The only difference is that the owner_id is not known because it can vary
+		
+	
+		
+	
+	//should the transactions be committed by the repo or by the owner?
+		repo since there may be hundreds of repos for a single user
+		
+		

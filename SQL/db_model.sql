@@ -1,5 +1,6 @@
 DROP TABLE `github_network`.`ghnd_repos`;
 drop table `github_network`.`ghnd_owners`;
+drop view ghnd_owner_repos;
 
 CREATE TABLE `github_network`.`ghnd_owners` (
   `owner_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Unique numeric primary key',

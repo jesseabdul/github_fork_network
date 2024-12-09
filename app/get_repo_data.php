@@ -20,7 +20,7 @@ connect_mysql ($pdo);
 //query for the last org request link, if there is none start with the default request parameters
 
 //send the curl request for the organizations:
-if (owner_request_loop('https://api.github.com/organizations?per_page=100', "Organization"))
+if (owner_request_loop('https://api.github.com/organizations?per_page=100', 0, "Organization"))
 {
 	//the loop executed successfully:
 	echo "the organization owner_request_loop completed successfully\n";
@@ -38,7 +38,7 @@ else
 //query for the last user request link 
 /*
 //send the curl request for the users:
-if (owner_request_loop('https://api.github.com/users?per_page=100', "User"))
+if (owner_request_loop('https://api.github.com/users?per_page=100', 0, "User"))
 {
 	//the loop executed successfully:
 	echo "the user owner_request_loop completed successfully\n";
@@ -121,20 +121,20 @@ function parse_json_from_api ($json_content, &$json_object, &$next_link_url)
 
 
 //this function requests the organizations in the GitHub network
-function owner_request_loop ($request_url, $owner_type = "Organization")
+function owner_request_loop ($request_url, $owner_request_counter, $owner_type = "Organization")
 {
 	echo "running org_request_loop ($request_url)\n";
 
 	$return_value = true;
 	
-	//increment the organization loop counter to stop the script before it loops too many times
-	$GLOBALS['org_loop_counter']++;
+	//increment the owner loop counter to stop the script before it loops too many times
+	$owner_request_counter++;
 	
-	echo "The value of \$GLOBALS['org_loop_counter'] is: ".$GLOBALS['org_loop_counter']."\n";
+	echo "The value of \$owner_request_counter is: ".$owner_request_counter."\n";
 	
-	if ($GLOBALS['org_loop_counter'] > 2)
+	if ($owner_request_counter > 2)
 	{
-		echo "The org_loop_counter is above 2, exit the program\n";
+		echo "The owner_request_counter is above 2, exit the program\n";
 		exit;
 	
 	}
@@ -144,7 +144,7 @@ function owner_request_loop ($request_url, $owner_type = "Organization")
 	{
 
 //		echo $curl_response;
-		file_put_contents($GLOBALS['debug_path']."org_".$GLOBALS['org_loop_counter'].".txt", $curl_response);
+		file_put_contents($GLOBALS['debug_path']."owner_".$owner_type."_".$owner_request_counter.".txt", $curl_response);
 
 		//parse the json
 		if (parse_json_from_api ($curl_response, $json_object, $next_link_url))
@@ -159,30 +159,52 @@ function owner_request_loop ($request_url, $owner_type = "Organization")
 			{
 				echo "The value of the current owner is: ".var_export($json_object[$i], true)."\n";
 
-				//query for the owner record by owner_id and owner_type values, if it
-				if (!owner_exists($json_object[$i]['id'], $owner_type = 'Organization', $owner_id))
+
+				//set the current owner json array for the owner_type array element based on the value of $owner_type 
+				$json_object[$i]['type'] = $owner_type;
+				$json_object[$i]['html_url'] = "https://github.com/".$json_object[$i]['login'];
+				
+
+				//attempt to process the owner
+				if (process_owner($json_object[$i], $owner_id))
 				{
-					//the owner doesn't exist, insert the owner record
-
-					echo "the owner doesn't exist, insert the owner record\n";
-
-					if (insert_owner ($json_object[$i], $owner_type, $owner_id))
+					//request all the repos associated with the org, starting with the first page with a maximum of 100 repos per page:
+					if (repo_request_loop($json_object[$i]['repos_url']."?per_page=100", $owner_id))
 					{
-						echo "the owner was inserted successfully\n";
+						//the repo_request_loop for the current owner was processed successfully
+						echo "the repo_request_loop for the current owner was processed successfully\n";
+						
+					}
+					else
+					{
+						//the repo_request_loop for the current owner was NOT processed successfully
+						echo "the repo_request_loop for the current owner was NOT processed successfully\n";
+						
 					}
 				}
-				
-
-				//request all the repos associated with the org, starting with the first page with a maximum of 100 repos per page:
-				$return_value = repo_request_loop($json_object[$i]['repos_url']."?per_page=100", $owner_id, $owner_type);
-				
+				else
+				{
+					//the current owner could not be processed successfully
+					echo "the current owner could not be processed successfully\n";
+					return false;
+				}
 			}
 			
-
-			if (!empty($next_link_url))
+			//check if the next_link_url is defined
+			if (!is_null($next_link_url))
 			{
 				//the next link is defined, recursively call org_request_loop with the $next_link_url
-				$return_value = org_request_loop ($next_link_url);
+				if (owner_request_loop ($next_link_url, $owner_request_counter, $owner_type))
+				{
+					//the org_request_loop was processed successfully:
+					echo "the org_request_loop was processed successfully\n";
+				}
+				else
+				{
+					//the org_request_loop for the next link was NOT processed successfully:
+					echo "the org_request_loop for the next link was NOT processed successfully\n";
+					return false;					
+				}
 			}			
 		}
 		else
@@ -202,273 +224,255 @@ function owner_request_loop ($request_url, $owner_type = "Organization")
 	
 }
 
-//recursive function that loops through the repos for a given org or user identified by id and type
-function repo_request_loop($request_url, $owner_id = null, $owner_type = "Organization")
+//recursive function that loops through the repos for a given org or user identified by id 
+function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = null)
 {
-	echo "running repo_request_loop ($request_url, $owner_id, $owner_type)\n";
+	echo "running repo_request_loop ($request_url, $owner_id, $parent_repo_id)\n";
+
+	echo "the repo loop counter is ".(++$GLOBALS['repo_loop_counter'])."\n";
 
 	//debugging statement
 //	return true;
 
 	$return_value = true;
 	
-	//increment the repo loop counter to stop the script before it loops too many times
-	$GLOBALS['repo_loop_counter']++;
-	
-	echo "The value of \$GLOBALS['repo_loop_counter'] is: ".$GLOBALS['repo_loop_counter']."\n";
-	
-/*	if ($GLOBALS['repo_loop_counter'] > 2)
-	{
-		exit;
-	}	
-*/	
 	//send the curl request for the repos:
 	if (curl_request($request_url, $curl_response))
 	{
+		//the repos request was successful:
 
-//		echo "The return value is: \n";
-
-//		echo $curl_response;
-
-//		echo $curl_response;
-		file_put_contents($GLOBALS['debug_path']."repo_".$GLOBALS['repo_loop_counter'].".txt", $curl_response);
+		//save the contents in a temporary file for debugging purposes
+		file_put_contents($GLOBALS['debug_path']."repo_".($GLOBALS['repo_loop_counter']).".txt", $curl_response);
 
 		//parse the repo json content
 		if (parse_json_from_api ($curl_response, $json_object, $next_link_url))
 		{
-			//the org json data was parsed successfully
+			//the repo json data was parsed successfully
 			
+			echo "the repo json data was parsed successfully\n";
 			
 			//loop through the repos
-//			for ($i = 0; $i < 5; $i ++)
 			for ($i = 0; $i < count($json_object); $i ++)
 			{
 //				echo "The value of the current repo is: ".var_export($json_object[$i], true)."\n";
 				
 				echo "The value of the current repo is: ".$json_object[$i]['full_name']."\n";
 
-				//initialize the variable:
-				$parent_repo_id = null;
 
-				//check if the current repo is a fork, if so query for the repo it was forked from and insert the current repo with fork_repo_id:
-				echo "check if the current repo has a fork\n";
-
-
-				if ($json_object[$i]['fork'])
+				//check if the repo exists in the DB based on the parsed id value
+				if (!repo_exists($json_object[$i], $repo_id))
 				{
-					//the current repository is a forked repository, get the information from the "parent" property
-					echo "the current repository is a forked repository, get the information from the fork url\n";
+					//the current repo does not already exist, process it
+					echo "the current repo does not already exist, process it\n";
+
+					//initialize the variable:
+					$parent_repo_id = null;
+
+					//check if the current repo is a fork, if so query for the repo it was forked from and insert the current repo with fork_repo_id:
+					echo "check if the current repo is a fork\n";
 
 
-					//request the current repository information:
-					if (curl_request($request_url, $parent_repo_curl_response))
+					if ($json_object[$i]['fork'])
 					{
-						//the detailed repo curl request was successful
-						echo "the detailed repo curl request was successful\n";
+						//the current repository is a forked repository, get the information from the "parent" property
+						echo "the current repository is a forked repository, get the information from the fork url\n";
 
-						//parse the parent object to get the owner and the repo
 
-				//		echo $parent_repo_curl_response;
-						file_put_contents($GLOBALS['debug_path']."repo_#".$parent_json_object[$i]['parent']['id'].".txt", $parent_repo_curl_response);
-
-						//parse the json
-						if (parse_json_from_api ($parent_repo_curl_response, $parent_json_object, $next_link_url))
+						//request the current repository information:
+						if (curl_request($json_object[$i]['url'], $parent_repo_curl_response))
 						{
-							//the json response was parsed successfully
-							
-							echo "The parent repository name is: ".$parent_json_object[0]['parent']['name']."\n";
+							//the detailed repo curl request was successful
+							echo "the detailed repo curl request was successful\n";
 
-							echo "The parent name is: ".$parent_json_object[$i][0]['owner']['login']."\n";
+							//parse the parent object to get the owner and the repo
 
-							//check if the owner of the parent repository exists in the database, if not insert it
-							if (owner_exists($parent_json_object[0]['parent']['owner']['id'], $parent_json_object[0]['parent']['owner']['type'], $parent_owner_id))
+					//		echo $parent_repo_curl_response;
+							file_put_contents($GLOBALS['debug_path']."repo_#".$json_object[$i]['id'].".txt", $parent_repo_curl_response);
+
+							//parse the json
+							if (parse_json_from_api ($parent_repo_curl_response, $parent_json_object, $next_link_url))
 							{
-								//the parent repository's owner exists, use the $parent_owner_id for the new repository
+								//the json response was parsed successfully
 
-								echo "the parent repository's owner exists\n";
+								echo "The value of \$parent_json_object is: " . var_export($parent_json_object, true)."\n";
+
 								
+								echo "The parent repository name is: ".$parent_json_object[0]['parent']['name']."\n";
+
+								echo "The parent name is: ".$parent_json_object[$i][0]['owner']['login']."\n";
 								
-								
-								
-								
-							}
-							else
-							{
-								//the owner does not exist,
-								
-								echo "the parent repository's owner does not exist, insert it\n";
-								
-								if (insert_owner ($parent_json_object[0]['parent'], $parent_json_object[0]['parent']['owner']['type'], $parent_owner_id))
+
+								//process the current parent repo:
+								if (process_repo($parent_json_object[0]['parent'], $parent_owner_id = null, $parent_repo_id))
 								{
-									//the parent owner record was inserted successfully
+									//the parent repo was processed successfully:
+									echo "the parent repo was processed successfully\n";
 
-
-									echo "the parent owner record was inserted successfully\n";
+								}
+								else
+								{
+									//the parent repo was NOT processed successfully:
 									
+									echo "the parent repo was NOT processed successfully\n";
+									
+								}
+
+
+								//***the owner of a forked repository is an interesting node, check for all repositories for the owner now that the owner record exists
+								
+								
+								echo "process all of the parent repo's owner's repos\n";
+								
+								//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
+								if (repo_request_loop ($parent_json_object[0]['parent']['owner']['repos_url']."?per_page=100", $parent_owner_id))
+								{
+									//the parent repo's owner repo request loop was successful
+									echo "the parent repo's owner repo request loop was successful\n";
 									
 								}
 								else
 								{
-									//the parent owner record could not be inserted
-									$return_value = false;
+									//the repo_request_loop failed
 									
-									echo "the parent owner record was NOT inserted successfully\n";
-							
-									//return false to indicate a DB error in the function call
-									return false;
-							
-								}
-								
-								
-								
-							}
-							
-
-							//check if the parent repo exists in the database, if not insert it
-							if (!repo_exists($parent_json_object[0]['parent']['id'], $parent_repo_id))
-							{
-								echo "The parent repo does not already exist, insert it\n";
-							
-								//insert/retrieve the repo_id and use the repo_id for the current repo's fork_repo_id value
-							
-
-								//the parent repo does not exist, insert it now:
-								if (insert_repo($parent_json_object[0]['parent'], $parent_owner_id, $parent_repo_id))
-								{
-									echo "The repo was inserted successfully\n";
+									echo "the parent repo's owner repo request loop was NOT successful\n";
 									
-									
-								}
-								else
-								{
-									
-									echo "Error - The repo was NOT inserted successfully\n";
+									//rollback the transaction:
+//									$GLOBALS['pdo']->rollback();
 								
 									//the app had a database error, return false to indicate the function call failed
 									return false;
 								}
-
-							}
-
-
-
-							//***the owner of a forked repository is an interesting node, check for all repositories for the owner now that the owner record exists
-							
-							//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
-							if ($return_value = repo_request_loop ($parent_json_object[0]['parent']['owner']['repos_url']."?per_page=100", $parent_owner_id, $parent_json_object[0]['parent']['owner']['type']))
-							{
-								//the parent repo's owner repo request loop was successful
-								echo "the parent repo's owner repo request loop was successful\n";
-								
+									
 							}
 							else
 							{
-								//the repo_request_loop failed
+								//the parent repository json data could not be parsed
+								echo "the parent repository json data could not be parsed\n";
 								
-								echo "the parent repo's owner repo request loop was NOT successful\n";
-								
-								//rollback the transaction:
-								$GLOBALS['pdo']->rollback();
-							
-								//the app had a database error, return false to indicate the function call failed
-								return false;
 							}
-								
+							
 						}
 						else
 						{
-							//the parent repository json data could not be parsed
-							echo "the parent repository json data could not be parsed\n";
 							
+							//the detailed repo curl request was not successful
+							echo "the detailed repo curl request was not successful\n";
 						}
-						
-					}
-					else
-					{
-						
-						//the detailed repo curl request was not successful
-						echo "the detailed repo curl request was not successful\n";
 					}
 
 
-					
-					
-					
-				}
-				
-				//use the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo data:
 
 
-				//check if there are any forks for the current repo:
-				if ($json_object[$i]['forks_count'] > 0)
-				{
-					//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
-					echo "This repo has more than one fork: ".$json_object[$i]['forks_count']."\n";
-					
-					
-					//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL and owner_type = NULL so the owner will be determined by parsing the repo's fork data:
-					
-					
-					if (repo_request_loop($json_object[$i]['forks_url']."?per_page=100", null, null))
-					{
-						//the repo's fork repo request loop was successful
-						echo "the repo's fork repo request loop was successful\n";
-						
-					}
-					else
-					{
-						//the repo's fork repo request loop was NOT successful
-						
-						echo "the repo's fork repo request loop was NOT successful\n";
-						
-						//rollback the transaction:
-						$GLOBALS['pdo']->rollback();
-					
-						//the app had a database error, return false to indicate the function call failed
-						return false;
-					}
-				}
 
-				//check if the repo exists in the DB based on the parsed id value
-				if (!repo_exists($json_object[$i]['id'], $repo_id))
-				{
 					echo "The repo does not already exist, insert it\n";
 
 					//the repo does not exist, insert it now:
 					
 					//we need to include the $parent_repo_id if there is one when we insert this record
-					if (insert_repo($json_object[$i], $owner_id, $repo_id, $parent_repo_id))
-					{
-						echo "The repo was inserted successfully\n";
-						
+					$json_object[$i]['parent_repo_id'] = $parent_repo_id;
 
-						//the repo insert was successful, commit the transaction
-						$GLOBALS['pdo']->commit();
 					
+					
+					//process the owner first, then insert the repo:
+					if (process_owner ($json_object[$i]['owner'], $owner_id))
+					{
+						//the repo owner record was processed successfully
+
+						//insert the repo
+						if (insert_repo($json_object[$i], $owner_id, $repo_id))
+						{
+							echo "The repo was inserted successfully\n";
+						}
+						else
+						{
+							
+							echo "Error - The repo was NOT inserted successfully\n";
+						
+							//rollback the transaction:
+//							$GLOBALS['pdo']->rollback();
+						
+							//the app had a database error, return false to indicate the function call failed
+							return false;
+						}
 					}
 					else
 					{
-						
-						echo "Error - The repo was NOT inserted successfully\n";
-					
+						//the owner was not processed successfully:
+
+						echo "the owner for the current repo was not processed successfully\n";
+
 						//rollback the transaction:
-						$GLOBALS['pdo']->rollback();
-					
-						//the app had a database error, return false to indicate the function call failed
+//						$GLOBALS['pdo']->rollback();
+
 						return false;
+					
+					}
+
+					
+					//use the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo data:
+
+
+
+
+
+					//check if there are any forks for the current repo:
+					if ($json_object[$i]['forks_count'] > 0)
+					{
+						//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
+						echo "This repo has more than one fork: ".$json_object[$i]['forks_count']."\n";
+						
+						
+						//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo's fork data:
+						
+						//process the current repo's forks and provide the $repo_id as the parent_repo_id of all the associated forked repos
+						if (repo_request_loop($json_object[$i]['forks_url']."?per_page=100", null, $repo_id))
+						{
+							//the repo's fork repo request loop was successful
+							echo "the repo's fork repo request loop was successful\n";
+							
+						}
+						else
+						{
+							//the repo's fork repo request loop was NOT successful
+							
+							echo "the repo's fork repo request loop was NOT successful\n";
+							
+							//rollback the transaction:
+//							$GLOBALS['pdo']->rollback();
+						
+							//the app had a database error, return false to indicate the function call failed
+							return false;
+						}
+					}
+					
+					//check if there were any processing errors for the current repo:
+					if ($return_value)
+					{
+						//there were no processing errors, commit the transaction
+//						$GLOBALS['pdo']->commit();
 					}
 				}
+				else
+				{
+					//The repo already exists, do nothing
+					echo "The repo already exists, do nothing\n";
+				}
 			}
-			
-			
-			echo "The repo_request_loop has finished the current iteration\n";
+
+			echo "The repo_request_loop has finished the current iteration, check if the next_url_link is defined\n";
 
 			if (!empty($next_link_url))
 			{
 				//the next link is defined, recursively call repo_request_loop with the $next_link_url
 
 				//request the next page of the list so it can be processed:
-				$return_value = repo_request_loop ($next_link_url, $owner_id, $owner_type);
+				if (!repo_request_loop ($next_link_url, $owner_id, $parent_repo_id))
+				{
+					//the repo_request_loop for the next page was not successful
+					echo "the repo_request_loop for the next page was not successful\n";
+
+					return false;
+				}
 			}			
 		}
 		else
@@ -477,7 +481,6 @@ function repo_request_loop($request_url, $owner_id = null, $owner_type = "Organi
 
 			//the app had a runtime error, return false
 			return false;
-			
 		}
 	}
 	else
@@ -486,15 +489,14 @@ function repo_request_loop($request_url, $owner_id = null, $owner_type = "Organi
 
 		//the app had a runtime error, return false
 		return false;
-
 	}
 
 	return $return_value;
 }
 
 
-
-function insert_owner ($owner_info, $owner_type, &$owner_id)
+//function that inserts an owner record based on the values defined in the $owner_info array
+function insert_owner ($owner_info, &$owner_id)
 {
 	echo "running insert_owner(".var_export($owner_info, true).", \$owner_id)\n";
 
@@ -507,15 +509,7 @@ function insert_owner ($owner_info, $owner_type, &$owner_id)
 	$stmt->bindValue(":source_owner_id", $owner_info['id']);
 	$stmt->bindValue(":login", $owner_info['login']);
 	$stmt->bindValue(":html_url", $owner_info['html_url']);
-	
-	//if the $owner_type argument is not specified use the value from the $owner_info array
-	if (is_null($owner_type))
-	{
-		$owner_type = $owner_info['type'];
-	}
-	
-	$stmt->bindValue(":owner_type", $owner_type);
-
+	$stmt->bindValue(":owner_type", $owner_info['type']);
 
 	if ($stmt->execute())
 	{
@@ -538,12 +532,15 @@ function insert_owner ($owner_info, $owner_type, &$owner_id)
 }
 
 //function to query the database to see if the owner record exists:
-function owner_exists($source_owner_id, $owner_type, &$owner_id)
+function owner_exists($owner_info, &$owner_id)
 {
+	//initialize the return value:
+	$return_value = true;
+	
 	//initialize the value of $owner_id
 	$owner_id = null;
 
-	echo "running owner_exists($source_owner_id, $owner_type, \$owner_id)\n";
+	echo "running owner_exists(".var_export($owner_info, true).", \$owner_id)\n";
 	
 	$query = "select owner_id from github_network.ghnd_owners where source_owner_id = :source_owner_id and owner_type = :owner_type";
 	
@@ -556,54 +553,66 @@ function owner_exists($source_owner_id, $owner_type, &$owner_id)
 	$stmt = $GLOBALS['pdo']->prepare($query);
 
 	// bind the parameters
-	$stmt->bindValue(":source_owner_id", $source_owner_id);
-	$stmt->bindValue(":owner_type", $owner_type);
+	$stmt->bindValue(":source_owner_id", $owner_info['id']);
+	$stmt->bindValue(":owner_type", $owner_info['type']);
 
-	$stmt->execute();
-	if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-		$owner_id = $row['owner_id'];
-	}	
+	if ($stmt->execute())
+	{
+		//the query was successful
+		
+		if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) 
+		{
+			//the query returned a row:
+			
+			//store the matching owner record's owner_id in the $owner_id variable
+			$owner_id = $row['owner_id'];
+		}	
+		else
+		{
+			//there were no rows returned by the query
+			echo "there were no rows returned by the query\n";
 
-	//return true if the owner record exists and false if the owner record does not exist:
-
-
-	echo "the value of owner_exists() is: ".(!is_null($owner_id))."\n";
-
-	return (!is_null($owner_id));
+			return false;
+		}
+	}
+	else
+	{
+		echo "the owner query was unsuccessful\n";
+		
+		return false;
+	}
+	
+	return $return_value;
 }
 
 
 
 
 
-function insert_repo ($repo_info, $owner_id, &$repo_id, $parent_repo_id = null)
+function insert_repo ($repo_info, $owner_id, &$repo_id)
 {
 	echo "running insert_repo(".var_export($repo_info, true).", \$repo_id)\n";
 
-	$query = "insert into github_network.ghnd_repos (source_repo_id, fork_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :fork_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
+	$query = "insert into github_network.ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
 
 	echo "the value of \$query is: $query\n";
 
 	$stmt = $GLOBALS['pdo']->prepare($query);
 
-	$stmt->bindValue(":source_repo_id", $repo_info['id']);
 
 
-
-	//**Fill this in later when the forking is implemented (both ways)
-	$stmt->bindValue(":fork_repo_id", null);
 
 	//fill this in once the topics parsing is implemented
 	$stmt->bindValue(":topics", null);
 
+	//bind the insert query variables:
+	$stmt->bindValue(":source_repo_id", $repo_info['id']);
 	$stmt->bindValue(":repo_name", $repo_info['name']);
 	$stmt->bindValue(":full_name", $repo_info['full_name']);
 	$stmt->bindValue(":repo_url", $repo_info['html_url']);
 	$stmt->bindValue(":created_at", $repo_info['created_at']);
 	$stmt->bindValue(":updated_at", $repo_info['updated_at']);
-	$stmt->bindValue(":parent_repo_id", $parent_repo_id);
-	
-	
+	$stmt->bindValue(":parent_repo_id", $repo_info['parent_repo_id']);
 	$stmt->bindValue(":owner_id", $owner_id);
 
 	if ($stmt->execute())
@@ -627,37 +636,115 @@ function insert_repo ($repo_info, $owner_id, &$repo_id, $parent_repo_id = null)
 }
 
 //function to query the database to see if the repo record exists:
-function repo_exists($source_repo_id, &$repo_id)
+function repo_exists($repo_info, &$repo_id)
 {
+	//initialize the value of $return_value
+	$return_value = true;
+
 	//initialize the value of $repo_id
 	$repo_id = null;
 	
-	echo "running repo_exists($source_repo_id, \$repo_id)\n";
+	echo "running repo_exists(".var_export($repo_info, true).", \$repo_id)\n";
 	
 	$query = "select repo_id from github_network.ghnd_repos where source_repo_id = :source_repo_id";
 	
 	echo "the value of \$query is: $query\n";
-	
-	
 
 	// prepare the statement. the placeholders allow PDO to handle substituting
 	// the values, which also prevents SQL injection
 	$stmt = $GLOBALS['pdo']->prepare($query);
 
 	// bind the parameters
-	$stmt->bindValue(":source_repo_id", $source_repo_id);
+	$stmt->bindValue(":source_repo_id", $repo_info['id']);
 
-	$stmt->execute();
-	if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-		$repo_id = $row['repo_id'];
-	}	
+	//execute the query
+	if ($stmt->execute())
+	{
+		//the query was successfully executed
+		
+		//retrieve the first result set row:
+		if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) 
+		{
+			//the result row was successfully retrieved
+			$repo_id = $row['repo_id'];
+		}
+		else
+		{
+			//the result row was not successfully retrieved
+			return false;
+		}	
+	}
+	else
+	{
+		//the query was not successfully executed
+		return false;
+	}
 
-	//return true if the repo record exists and false if the repo record does not exist:
+	return $return_value;
+}
 
+//this function will determine if a repo record exists for the $repo_info array that contains the repo information. If the repo record exists then the database repo_id will be returned.  If the repo record does not exist then it will be inserted into the DB and the repo_id will be returned:
+//if $owner_id is null then the function will attempt to check if the owner exists from the "owner" property of the $repo_info array
 
-	echo "the value of repo_exists() is: ".(!is_null($repo_id))."\n";
+function process_repo ($repo_info, &$owner_id, &$repo_id)
+{
+	$return_value = true;
+	$repo_id = null;
+	
+	//check if the repository exists in the database, if not insert it
+	if (repo_exists($repo_info, $repo_id))
+	{
+		//the repository exists, use the $repo_id for the new repository
 
-	return (!is_null($repo_id));
+		echo "the repository exists\n";
+		
+	}
+	else
+	{
+		//the repository does not exist,
+		
+		echo "the repository does not exist, insert it\n";
+		
+
+		//check if the owner_id is defined, if not then attempt to process the owner
+		if ((!is_null($owner_id)) || (process_owner ($repo_info['owner'], $owner_id)))
+		{
+			//the owner_id is defined or the owner record was processed successfully:
+			echo "the owner_id is defined or the owner record was processed successfully\n";
+			
+			//insert the repo
+			if (insert_repo ($repo_info, $owner_id, $repo_id))
+			{
+				//the repo record was inserted successfully
+				echo "the repo record was inserted successfully\n";
+				
+				
+			}
+			else
+			{
+				//the repo record could not be inserted
+
+				echo "the repo record was NOT inserted successfully\n";
+		
+				//return false to indicate an error in the function call
+				return false;
+		
+			}
+			
+		}
+		else
+		{
+			echo "the owner record was not processed successfully\n";
+	
+			//return false to indicate an error in the function call
+			return false;
+			
+			
+		}
+	}
+
+	return $return_value;	
+	
 }
 
 
@@ -671,6 +758,51 @@ function connect_mysql (&$pdo)
 	$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 	
+}
+
+//this function will determine if an owner record exists for the $owner_info array that contains the owner information. If the owner record exists then the database owner_id will be returned.  If the owner record does not exist then it will be inserted intothe DB and the owner_id will be returned:
+function process_owner ($owner_info, &$owner_id)
+{
+	$return_value = true;
+	$owner_id = null;
+	
+	//check if the owner exists in the database, if not insert it
+	if (owner_exists($owner_info, $owner_id))
+	{
+		//the owner exists, use the $parent_owner_id for the new repository
+
+		echo "the owner exists\n";
+		
+	}
+	else
+	{
+		//the owner does not exist,
+		
+		echo "the owner does not exist, insert it\n";
+		
+		if (insert_owner ($owner_info, $owner_id))
+		{
+			//the owner record was inserted successfully
+
+
+			echo "the owner record was inserted successfully\n";
+			
+			
+		}
+		else
+		{
+			//the owner record could not be inserted
+			$return_value = false;
+			
+			echo "the owner record was NOT inserted successfully\n";
+	
+			//return false to indicate a DB error in the function call
+			return false;
+	
+		}
+	}
+
+	return $return_value;
 }
 
 
