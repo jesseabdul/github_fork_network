@@ -185,7 +185,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 //recursive function that loops through the repos for a given org or user identified by id 
 function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = null)
 {
-	echo "running repo_request_loop ($request_url, $owner_id, $parent_repo_id)\n";
+	echo "\n\n running repo_request_loop ($request_url, $owner_id, $parent_repo_id)\n";
 
 	echo "the repo loop counter is ".(++$GLOBALS['repo_loop_counter'])."\n";
 
@@ -217,7 +217,8 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 			//loop through the repos
 			for ($i = 0; $i < count($json_object); $i ++)
 			{
-//				echo "The value of the current repo is: ".var_export($json_object[$i], true)."\n";
+				echo "For the repo_request_loop function in the json processing loop, the value of the current repo is: ".var_export($json_object[$i], true)."\n\n";
+
 				//process the current repository
 				if (process_repo ($json_object[$i], $repo_id, $owner_id, $parent_repo_id))
 				{
@@ -372,7 +373,7 @@ function owner_exists($owner_info, &$owner_id)
 
 function insert_repo ($repo_info, $owner_id, &$repo_id)
 {
-	echo "running insert_repo(".var_export($repo_info['id'], true).", \$repo_id)\n";
+	echo "running insert_repo(".var_export($repo_info['full_name'], true).", \$repo_id)\n";
 
 	$query = "insert into github_network.ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
 
@@ -425,7 +426,7 @@ function repo_exists($repo_info, &$repo_id)
 	//initialize the value of $repo_id
 	$repo_id = null;
 	
-	echo "running repo_exists(".var_export($repo_info['id'], true).", \$repo_id)\n";
+	echo "running repo_exists(".var_export($repo_info['full_name'], true).", \$repo_id)\n";
 	
 	$query = "select repo_id from github_network.ghnd_repos where source_repo_id = :source_repo_id";
 	
@@ -470,7 +471,7 @@ function repo_exists($repo_info, &$repo_id)
 function process_repo_record ($repo_info, &$owner_id, &$repo_id)
 {
 
-	echo "runnning process_repo_record (".var_export($repo_info['id'], true).", $owner_id, $repo_id)\n";
+	echo "\n\n runnning process_repo_record (".var_export($repo_info['full_name'], true).", $owner_id, $repo_id)\n";
 
 	$return_value = true;
 	$repo_id = null;
@@ -600,7 +601,7 @@ function process_owner_record ($owner_info, &$owner_id)
 //$parent_repo_id contains the parent_repo_id for the 
 function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id = null)
 {
-	echo "running process_repo (".$repo_info['id'].", $owner_id, $parent_repo_id)\n";
+	echo "\n\n running process_repo (".$repo_info['full_name'].", $owner_id, $parent_repo_id)\n";
 	
 	//initialize the $return_value variable
 	$return_value = true;
@@ -684,6 +685,11 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 							
 						}
 					}
+					else
+					{
+						//The parent is not a forked repo
+						echo "The parent is not a forked repo\n";
+					}
 					
 					
 					//initialize the parent_owner_id to be null since this is not known about the parent repo's owner
@@ -749,6 +755,11 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 				echo "the detailed repo curl request was not successful\n";
 			}
 		}
+		else
+		{
+			
+			echo "The parent_repo_id is already defined (".$parent_repo_id.") or this is not a forked repository (".$repo_info['fork'].")\n";
+		}
 
 		echo "The repo does not already exist, insert it\n";
 
@@ -802,7 +813,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 		if ($repo_info['forks_count'] > 0)
 		{
 			//request the forks in a recursive function, this version must parse the owner from the response instead of the $owner_id since it is not based on a query for the owner:
-			echo "This repo has at least one fork: ".$repo_info['forks_count']."\n";
+			echo "This repo has at least one fork: ".$repo_info['forks_count'].", request all of the forked repos\n";
 			
 			
 			//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo's fork data:
@@ -842,7 +853,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 	}
 
 	//release the json array from memory
-	$repo_info = null;
+//	$repo_info = null;
 	
 	return $return_value;
 	
