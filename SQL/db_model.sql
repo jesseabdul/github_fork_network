@@ -8,6 +8,7 @@ CREATE TABLE `github_network`.`ghnd_owners` (
   `login` VARCHAR(100) NOT NULL COMMENT 'The organization or user name in the source data system',
   `html_url` VARCHAR(500) NOT NULL COMMENT 'The URL for the owner in the source system',
   `owner_type` ENUM('Organization', 'User') NOT NULL COMMENT 'The owner type defined in the source system, User or Organization',
+  `owner_processed_yn` tinyint COMMENT 'flag to indicate if the current owner was successfully processed, 1 indicate the owner has been successfully processed and 0 indicates is has not',
   PRIMARY KEY (`owner_id`),
   UNIQUE INDEX `source_owner_id_UNIQUE` (`source_owner_id` ASC) VISIBLE,
   INDEX `owner_type_indx` (`owner_type` ASC) VISIBLE,
@@ -27,6 +28,7 @@ CREATE TABLE `github_network`.`ghnd_repos` (
   `created_at` DATETIME NULL COMMENT 'The repository\'s created_at value',
   `updated_at` DATETIME NULL COMMENT 'The repository\'s updated_at value',
   `owner_id` INT NOT NULL COMMENT 'Foreign key references to the ghnd_owners record that owns the repository',
+  `repo_processed_yn` tinyint COMMENT 'flag to indicate if the current repo was successfully processed, 1 indicate the repo has been successfully processed and 0 indicates is has not',
   PRIMARY KEY (`repo_id`),
   UNIQUE INDEX `source_repo_id_UNIQUE` (`source_repo_id` ASC) VISIBLE,
   INDEX `parent_repo_id` (`parent_repo_id` ASC) VISIBLE,
@@ -35,7 +37,7 @@ COMMENT = 'GitHub Network Data - Repositories';
 
 
 
-create view ghnd_owner_repos as select ghnd_owners.owner_id, source_owner_id, login, html_url, owner_type, repo_id, source_repo_id, parent_repo_id, repo_name, full_name, topics, created_at, updated_at from ghnd_owners inner join ghnd_repos on ghnd_owners.owner_id = ghnd_repos.owner_id order by owner_type, ghnd_owners.owner_id, repo_name; 
+create view ghnd_owner_repos as select ghnd_owners.owner_id, source_owner_id, login, html_url, owner_type, owner_processed_yn, repo_id, source_repo_id, parent_repo_id, repo_name, full_name, topics, created_at, updated_at, repo_processed_yn from ghnd_owners inner join ghnd_repos on ghnd_owners.owner_id = ghnd_repos.owner_id order by owner_type, ghnd_owners.owner_id, repo_name; 
 
 --create another view with one more level of the associated child repos
 

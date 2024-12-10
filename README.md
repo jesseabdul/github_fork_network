@@ -63,7 +63,21 @@ Gephi: visualize with standard method
 
 
 
+
+
+
+
 to do:
+	debugging:
+		huggingface/accelerate-wip is causing an infinite loop somehow
+			This is happening after huggingface/accelerate is processed and it checks for all its forked urls which huggingface/accelerate-wip is one of them:
+				it never inserts huggingface/accelerate-wip as a repo
+				//maybe need to check if the owner id is the same as the owner id of the previous function call?
+				
+				//no need to do the parent owner repos or owner repos if the owner has already been processed
+
+
+
 	_ implement for users
 
 
@@ -86,6 +100,35 @@ to do:
 	_ change the timeout setting to make it long or remove it
 	
 	_ rename all of the json files that are saved on the server (for debugging).  Have them all use the ID so we don't use the global variable and we can know what GH recs each one corresponds to.
+	
+	
+	
+	_ how do we prevent the same owner from being queried for each time
+		Check if the owner of the parent repo is the same as the owner of the current repo, if so there is no need to process the parent, just use the same owner_id when the record is processed
+		We should track each owner that has been processed successfully
+		
+		Transactions will not work since they span different owners
+			can't really do repositories either since they can be executed on parents or children at any time
+		
+		if a repo is not marked as successfully processed then the next time the process runs it can reprocess the owner and its associated repos
+
+		Is there a case where the owner will finish processing but the repo is not done processing and a commit would cause a repo that has not been completely processed to be committed
+			Yes, but that would be ok as long as the repo_processed_yn has not been updated
+			Same goes for the owners, if they are committed but haven't been marked as owner_processed_yn they should be reprocessed
+			
+	business rules:
+		tracking each repo and owner, once they are completely processed the script commits the transaction
+			If the record exists and the processed_yn flag is not set then it should be reprocessed
+			
+			Resume functionality:
+				Query for all orgs that have not been processed 
+				Then start in on the normal processing on orgs
+			
+			
+	_ check if we can get rid of type for owners in the processing code (DB only)
+		these are likely unique ids for both sets of objects combined
+			
+
 	
 	
 	

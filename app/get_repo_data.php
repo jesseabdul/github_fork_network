@@ -22,6 +22,19 @@ connect_mysql ($pdo);
 
 //query for the last org request link, if there is none start with the default request parameters
 
+//begin the new transaction:
+$GLOBALS['pdo']->beginTransaction();
+
+
+
+//query all of the orgs in the DB that have not been successfully processed yet
+
+	//write and execute a function for this
+
+
+
+
+
 //send the curl request for the organizations:
 if (owner_request_loop('https://api.github.com/organizations?per_page=100', 0, "Organization"))
 {
