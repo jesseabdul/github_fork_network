@@ -7,49 +7,46 @@ use Curl\Curl;
 //define a global variable to track all of the owners that have been processed so far in this iteration, it will contain the version control system's unique id so it's easy to compare them during processing.  If an owner has been processed or if the processing has started do not process the owner again during this execution
 $processed_owner_ids = array();
 
-//define a global variable to track all of the owners that have been processed so far in this iteration, it will contain the version control system's unique id so it's easy to compare them during processing.  If an owner has been processed or if the processing has started do not process the owner again during this execution
-$processed_owner_ids = array();
+//define a global variable to track all of the repos that have been processed so far in this iteration, it will contain the version control system's unique id so it's easy to compare them during processing.  If an repo has been processed or if the processing has started do not process the repo again during this execution
+$processed_repo_ids = array();
 
 
 //function that returns true if the owner has been processed in this script execution or if the repo is marked as being successfully processed and false if not:
 function owner_processed ($source_owner_id)
 {
-	echo "running owner_processed ($source_owner_id, $owner_type)\n";
+	echo "running owner_processed ($source_owner_id)\n";
 	
 	
 	$return_value = true;
 	
-	if ($owner_type == "Organization")
+	//check if the owner has been processed yet (in the current processing attempt)
+	echo "check if the owner has been processed yet (in the current processing attempt)\n";
+	
+	if ($return_value = in_array($source_owner_id, $GLOBALS['processed_owner_ids']))
 	{
-		//check if the organization has been processed yet (in the current processing attempt)
-		echo "check if the organization has been processed yet (in the current processing attempt)\n";
-		
-		if ($return_value = in_array($source_owner_id, $GLOBALS['processed_owner_ids']))
+		//the owner record has been processed in the current processing attempt
+		echo "the owner record has been processed in the current processing attempt\n";
+	}
+	else
+	{
+		//check if the owner has been processed yet (indicated in the database)
+		echo "check if the owner has been processed yet (indicated in the database)\n";
+		//query the database
+		if ($return_value = owner_exists(array("id"=>$source_owner_id), $owner_db_info))
 		{
-			//the owner record has been processed in the current processing attempt
-			echo "the owner record has been processed in the current processing attempt\n";
+			//the owner has already been processed:
+			echo "the owner record exists in the DB, \$owner_db_info['owner_processed_yn'] is: ".$owner_db_info['owner_processed_yn']."\n";
+		
+			//set the return value based on if the owner record has been marked as processed (1) or not (0)
+			$return_value = ($owner_db_info['owner_processed_yn'] == 1 ? true : false);
 		}
 		else
 		{
-			//check if the organization has been processed yet (indicated in the database)
-			echo "check if the organization has been processed yet (indicated in the database)\n";
-			//query the database
-			if ($return_value = owner_exists(array("id"=>$source_owner_id), $owner_db_info))
-			{
-				//the owner has already been processed:
-				echo "the owner record exists in the DB, \$owner_db_info['owner_processed_yn'] is: ".$owner_db_info['owner_processed_yn']."\n";
+			//the owner has not been processed yet, add it to the $GLOBALS['processed_owner_ids'] to indicate it has been initiated for processing
 			
-				//set the return value based on if the owner record has been marked as processed (1) or not (0)
-				$return_value = ($owner_db_info['owner_processed_yn'] == 1 ? true : false);
-			}
-			else
-			{
-				//the owner has not been processed yet, add it to the $GLOBALS['processed_owner_ids'] to indicate it has been initiated for processing
-				
-				echo "the owner has not been processed yet, add it to the global variable \$processed_owner_ids to indicate it has been initiated for processing";
-				
-				$GLOBALS['processed_owner_ids'][] = $source_owner_id;
-			}
+			echo "the owner has not been processed yet, add it to the global variable \$processed_owner_ids to indicate it has been initiated for processing";
+			
+			$GLOBALS['processed_owner_ids'][] = $source_owner_id;
 		}
 	}
 	return $return_value;
@@ -65,37 +62,34 @@ function repo_processed ($source_repo_id)
 	
 	$return_value = true;
 	
-	if ($repo_type == "Organization")
+	//check if the repo has been processed yet (in the current processing attempt)
+	echo "check if the repo has been processed yet (in the current processing attempt)\n";
+	
+	if ($return_value = in_array($source_repo_id, $GLOBALS['processed_repo_ids']))
 	{
-		//check if the organization has been processed yet (in the current processing attempt)
-		echo "check if the organization has been processed yet (in the current processing attempt)\n";
-		
-		if ($return_value = in_array($source_repo_id, $GLOBALS['processed_repo_ids']))
+		//the repo record has been processed in the current processing attempt
+		echo "the repo record has been processed in the current processing attempt\n";
+	}
+	else
+	{
+		//check if the repo has been processed yet (indicated in the database)
+		echo "check if the repo has been processed yet (indicated in the database)\n";
+		//query the database
+		if ($return_value = repo_exists(array("id"=>$source_repo_id), $repo_db_info))
 		{
-			//the repo record has been processed in the current processing attempt
-			echo "the repo record has been processed in the current processing attempt\n";
+			echo "the repo record exists in the DB, \$repo_db_info['repo_processed_yn'] is: ".$repo_db_info['repo_processed_yn']."\n";
+		
+			//set the return value based on if the repo record has been marked as processed (1) or not (0)
+			$return_value = ($repo_db_info['repo_processed_yn'] == 1 ? true : false);
+			
 		}
 		else
 		{
-			//check if the organization has been processed yet (indicated in the database)
-			echo "check if the organization has been processed yet (indicated in the database)\n";
-			//query the database
-			if ($return_value = repo_exists(array("id"=>$source_repo_id), $repo_db_info))
-			{
-				echo "the repo record exists in the DB, \$repo_db_info['repo_processed_yn'] is: ".$repo_db_info['repo_processed_yn']."\n";
+			//the repo has not been processed yet, add it to the $GLOBALS['processed_repo_ids'] to indicate it has been initiated for processing
 			
-				//set the return value based on if the repo record has been marked as processed (1) or not (0)
-				$return_value = ($repo_db_info['repo_processed_yn'] == 1 ? true : false);
-				
-			}
-			else
-			{
-				//the repo has not been processed yet, add it to the $GLOBALS['processed_repo_ids'] to indicate it has been initiated for processing
-				
-				echo "the repo has not been processed yet, add it to the global variable \$processed_repo_ids to indicate it has been initiated for processing";
-				
-				$GLOBALS['processed_repo_ids'][] = $source_repo_id;
-			}
+			echo "the repo has not been processed yet, add it to the global variable \$processed_repo_ids to indicate it has been initiated for processing";
+			
+			$GLOBALS['processed_repo_ids'][] = $source_repo_id;
 		}
 	}
 	return $return_value;
@@ -170,8 +164,8 @@ function parse_json_from_api ($json_content, &$json_object, &$next_link_url)
 
 
 
-//this function requests the organizations in the GitHub network
-function owner_request_loop ($request_url, $owner_request_counter, $owner_type = "Organization")
+//this function requests the owners in the GitHub network
+function owner_request_loop ($request_url, $owner_request_counter, $owner_type = "owner")
 {
 	echo "running org_request_loop ($request_url)\n";
 
@@ -189,7 +183,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 	
 	}
 	
-	//send the curl request for the organizations:
+	//send the curl request for the owners:
 	if (curl_request($request_url, $curl_response))
 	{
 
@@ -214,7 +208,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 
 
 				//check if the current owner id has been processed in this current execution yet:
-				if (!owner_processed($json_object[$i]['id'], $json_object[$i]['type']))
+				if (!owner_processed($json_object[$i]['id']))
 				{
 					//the current owner id has not been processed in this current execution yet, process it now:
 					echo "the current owner id has not been processed in this current execution or previous execution yet, process it now\n";
@@ -382,7 +376,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 			//loop through the repos
 			for ($i = 0; $i < count($json_object); $i ++)
 			{
-				echo "\n\nFor the repo_request_loop function in the json processing loop, the value of the current repo is: ".var_export($json_object[$i], true)."\n\n";
+//				echo "\n\nFor the repo_request_loop function in the json processing loop, the value of the current repo is: ".var_export($json_object[$i], true)."\n\n";
 
 
 				//check if the current repo id has been processed in this current execution yet:
@@ -488,7 +482,7 @@ function insert_owner ($owner_info, &$owner_id)
 {
 	echo "running insert_owner(".var_export($owner_info['id'], true).", \$owner_id)\n";
 
-	$query = "insert into github_network.ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
+	$query = "insert into ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
 
 //	echo "the value of \$query is: $query\n";
 
@@ -533,7 +527,7 @@ function owner_exists($owner_info, &$owner_db_info)
 
 	echo "\nrunning owner_exists(".var_export($owner_info['id'], true).", \$owner_id)\n";
 	
-	$query = "select * from github_network.ghnd_owners where source_owner_id = :source_owner_id";
+	$query = "select * from ghnd_owners where source_owner_id = :source_owner_id";
 	
 //	echo "the value of \$query is: $query\n";
 	
@@ -584,7 +578,7 @@ function insert_repo ($repo_info, $owner_id, &$repo_id)
 {
 	echo "\nrunning insert_repo(".var_export($repo_info['full_name'], true).", \$repo_id)\n";
 
-	$query = "insert into github_network.ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
+	$query = "insert into ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
 
 //	echo "the value of \$query is: $query\n";
 
@@ -635,9 +629,9 @@ function repo_exists($repo_info, &$repo_db_info)
 	//initialize the value of $repo_id
 	$repo_id = null;
 	
-	echo "\nrunning repo_exists(".var_export($repo_info['full_name'], true).", \$repo_id)\n";
+//	echo "\nrunning repo_exists(".var_export($repo_info, true).", \$repo_id)\n";
 	
-	$query = "select * from github_network.ghnd_repos where source_repo_id = :source_repo_id";
+	$query = "select * from ghnd_repos where source_repo_id = :source_repo_id";
 	
 //	echo "the value of \$query is: $query\n";
 
@@ -832,8 +826,6 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 		//the current repo does not already exist, process it
 		echo "the current repo does not already exist, process it\n";
 		
-		//set the value of $repo_id
-		$repo_id = $repo_db_info['repo_id'];
 
 		//check if the current repo is a fork, if so query for the repo it was forked from and insert the current repo with fork_repo_id:
 		echo "check if the current repo is a fork\n";
@@ -1107,7 +1099,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 function update_owner_processed_yn ($owner_id)
 {
-	$sql = "update ghnd_owners set owner_processed_yn = 'Y' where owner_id = :owner_id";
+	$query = "update ghnd_owners set owner_processed_yn = 1 where owner_id = :owner_id";
 	
 //	echo "the value of \$query is: $query\n";
 
@@ -1130,7 +1122,7 @@ function update_owner_processed_yn ($owner_id)
 
 function update_repo_processed_yn ($repo_id)
 {
-	$sql = "update ghnd_repos set repo_processed_yn = 'Y' where repo_id = :repo_id";
+	$query = "update ghnd_repos set repo_processed_yn = 1 where repo_id = :repo_id";
 	
 //	echo "the value of \$query is: $query\n";
 
