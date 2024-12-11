@@ -1,12 +1,13 @@
-DROP TABLE `github_network`.`ghnd_repos`;
-drop table `github_network`.`ghnd_owners`;
-drop view ghnd_owner_repos;
+DROP TABLE ghnd_repos;
+drop table ghnd_owners;
+drop view ghnd_owner_repos_v;
+drop view ghnd_parent_child_owner_repos_v;
 
 CREATE TABLE `github_network`.`ghnd_owners` (
   `owner_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Unique numeric primary key',
   `source_owner_id` INT NOT NULL COMMENT 'The id defined in the source system (e.g. GitHub) for the given owner',
   `login` VARCHAR(100) NOT NULL COMMENT 'The organization or user name in the source data system',
-  `html_url` VARCHAR(500) NOT NULL COMMENT 'The URL for the owner in the source system',
+  `owner_html_url` VARCHAR(500) NOT NULL COMMENT 'The URL for the owner in the source system',
   `owner_type` ENUM('Organization', 'User') NOT NULL COMMENT 'The owner type defined in the source system, User or Organization',
   `owner_processed_yn` tinyint default 0 COMMENT 'flag to indicate if the current owner was successfully processed, 1 indicate the owner has been successfully processed and 0 indicates is has not',
   PRIMARY KEY (`owner_id`),
@@ -21,9 +22,9 @@ CREATE TABLE `github_network`.`ghnd_repos` (
   `repo_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Unique numeric primary key',
   `source_repo_id` INT NOT NULL COMMENT 'The id defined in the source system (e.g. GitHub) for the given repo',
   `parent_repo_id` INT NULL COMMENT 'foreign key that references the ghnd_repo_owners table that defines the fork dependency for the given repo (if any).  This foreign key points to a repo_id of a ghnd_repos record that the given repo is a fork from.  This field is null when the given repo is not a fork from any repository',
-  `repo_name` VARCHAR(100) NOT NULL COMMENT 'The repository name',
+  `name` VARCHAR(100) NOT NULL COMMENT 'The repository name',
   `full_name` VARCHAR(400) NOT NULL COMMENT 'The full name for the repository',
-  `repo_url` VARCHAR(500) NOT NULL COMMENT 'The URL for the owner in the source system',
+  `repo_html_url` VARCHAR(500) NOT NULL COMMENT 'The URL for the owner in the source system',
   `topics` VARCHAR(1000) NULL COMMENT 'The comma-delimited list of topics defined for the repo in the source system',
   `created_at` DATETIME NULL COMMENT 'The repository\'s created_at value',
   `updated_at` DATETIME NULL COMMENT 'The repository\'s updated_at value',
@@ -35,10 +36,72 @@ CREATE TABLE `github_network`.`ghnd_repos` (
   INDEX `owner_id` (`owner_id` ASC) VISIBLE)
 COMMENT = 'GitHub Network Data - Repositories';
 
+create or replace view ghnd_owner_repos_v as 
+select
+
+ghnd_owners.owner_id,
+ghnd_owners.source_owner_id,
+ghnd_owners.login,
+ghnd_owners.owner_html_url,
+ghnd_owners.owner_type,
+ghnd_owners.owner_processed_yn,
+ghnd_repos.repo_id,
+ghnd_repos.source_repo_id,
+ghnd_repos.parent_repo_id,
+ghnd_repos.name,
+ghnd_repos.full_name,
+ghnd_repos.repo_html_url,
+ghnd_repos.topics,
+ghnd_repos.created_at,
+ghnd_repos.updated_at,
+ghnd_repos.repo_processed_yn
+from 
+ghnd_owners inner join ghnd_repos on ghnd_owners.owner_id = ghnd_repos.owner_id 
+order by ghnd_owners.owner_type, ghnd_owners.login, ghnd_repos.name; 
+
+create or replace view ghnd_parent_child_owner_repos_v as 
+select
+parent_owner_repos.owner_id parent_owner_id,
+parent_owner_repos.source_owner_id parent_source_owner_id,
+parent_owner_repos.login parent_login,
+parent_owner_repos.owner_html_url parent_owner_html_url,
+parent_owner_repos.owner_type parent_owner_type,
+parent_owner_repos.owner_processed_yn parent_owner_processed_yn,
+parent_owner_repos.repo_id parent_repo_id,
+parent_owner_repos.source_repo_id parent_source_repo_id,
+parent_owner_repos.parent_repo_id parent_parent_repo_id,
+parent_owner_repos.name parent_name,
+parent_owner_repos.full_name parent_full_name,
+parent_owner_repos.repo_html_url parent_repo_html_url,
+parent_owner_repos.topics parent_topics,
+parent_owner_repos.created_at parent_created_at,
+parent_owner_repos.updated_at parent_updated_at,
+parent_owner_repos.repo_processed_yn parent_repo_processed_yn,
+child_owner_repos.owner_id child_owner_id,
+child_owner_repos.source_owner_id child_source_owner_id,
+child_owner_repos.login child_login,
+child_owner_repos.owner_html_url child_owner_html_url,
+child_owner_repos.owner_type child_owner_type,
+child_owner_repos.owner_processed_yn child_owner_processed_yn,
+child_owner_repos.repo_id child_repo_id,
+child_owner_repos.source_repo_id child_source_repo_id,
+child_owner_repos.parent_repo_id child_parent_repo_id,
+child_owner_repos.name child_name,
+child_owner_repos.full_name child_full_name,
+child_owner_repos.repo_html_url child_repo_html_url,
+child_owner_repos.topics child_topics,
+child_owner_repos.created_at child_created_at,
+child_owner_repos.updated_at child_updated_at,
+child_owner_repos.repo_processed_yn child_repo_processed_yn
+from ghnd_owner_repos_v parent_owner_repos inner join
+ghnd_owner_repos_v child_owner_repos on 
+parent_owner_repos.repo_id = child_owner_repos.parent_repo_id
+
+order by parent_owner_repos.owner_type, parent_owner_repos.login, parent_owner_repos.name, child_owner_repos.owner_type, child_owner_repos.login, child_owner_repos.name; 
 
 
-create view ghnd_owner_repos as select ghnd_owners.owner_id, source_owner_id, login, html_url, owner_type, owner_processed_yn, repo_id, source_repo_id, parent_repo_id, repo_name, full_name, topics, created_at, updated_at, repo_processed_yn from ghnd_owners inner join ghnd_repos on ghnd_owners.owner_id = ghnd_repos.owner_id order by owner_type, ghnd_owners.owner_id, repo_name; 
 
---create another view with one more level of the associated child repos
 
---create another view summarizing the associated child repos (count, max created, max updated, etc.)
+
+
+

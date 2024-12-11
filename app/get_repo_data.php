@@ -31,8 +31,25 @@ $GLOBALS['pdo']->beginTransaction();
 
 	//write and execute a function for this
 
+echo "reprocess all owners that have not been marked as successfully processed owner_processed_yn = 1\n";
+if (reprocess_owners())
+{
+	echo "the unprocessed owners have all been successfully processed\n";
+}
+else
+{
+	echo "one or more unprocessed owners have not been successfully processed\n";
+}
 
-
+echo "reprocess all repos that have not been marked as successfully processed repo_processed_yn = 1\n";
+if (reprocess_repos())
+{
+	echo "the unprocessed repos have all been successfully processed\n";
+}
+else
+{
+	echo "one or more unprocessed repos have not been successfully processed\n";
+}
 
 
 //send the curl request for the organizations:

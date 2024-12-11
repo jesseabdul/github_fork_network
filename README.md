@@ -61,6 +61,11 @@ R: calculate all metrics for the network and compare to random networks to deter
 Gephi: visualize with standard method
 
 
+
+look at high degree nodes, look for hubs
+	roll up the 
+
+
 bipartite graph?
 temporal -> no time to do it myself, but there is time to requery the graph and compare the two sets of nodes/links
 
@@ -71,7 +76,8 @@ temporal -> no time to do it myself, but there is time to requery the graph and 
 
 
 
-
+_ do we want to commit owners/repos even if they weren't successfully processed?
+	having a processed_yn = 0 will still have the object reprocessed
 
 
 known issues:

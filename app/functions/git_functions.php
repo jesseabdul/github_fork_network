@@ -11,6 +11,162 @@ $processed_owner_ids = array();
 $processed_repo_ids = array();
 
 
+//function that takes a result set row $repo_info and nests the owner information into an array element
+function transform_repo_results (&$repo_info)
+{
+	//return an array that has an owner array element with the corresponding owner information:
+	
+	//add an owner element with the owner information from the $repo_info array
+	$repo_info['owner'] = array('id'=>$repo_info['source_owner_id'], 'login'=>$repo_info['login'], 'html_url' => $repo_info['owner_html_url'], 'type' => $repo_info['owner_type']);
+
+	//remove the array elements that were copied into the owner element
+	unset($repo_info['source_owner_id']);
+	unset($repo_info['login']);
+	unset($repo_info['owner_html_url']);
+	unset($repo_info['owner_type']);
+		
+}
+
+
+//function that queries the DB for all owners that have not been marked as processed yet and process those recs in a loop using repo_request_loop()
+function reprocess_owners ()
+{
+	echo "running reprocess_owners()\n";
+	//initialize the return value
+	$return_value = true;
+	
+	$query = "select source_owner_id id, login, owner_html_url html_url, owner_type type, (CASE WHEN owner_type = 'Organization' THEN CONCAT('https://api.github.com/orgs/', login , '/repos') ELSE CONCAT('https://api.github.com/users/', login , '/repos') END) repos_url from ghnd_owners where owner_processed_yn = 0";
+
+	// prepare the statement. the placeholders allow PDO to handle substituting
+	// the values, which also prevents SQL injection
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+
+	//execute the query
+	if ($stmt->execute())
+	{
+		//the query was successfully executed
+		
+		//retrieve the owner records using repo_request_loop:
+		while ($owner_info = $stmt->fetch(PDO::FETCH_ASSOC)) 
+		{
+			echo "process the current owner is: ".$owner_info['login']."\n";
+			if (process_owner($owner_info))
+			{
+				//the owner was processed successfully:
+				echo "the owner record (".$owner_info['login'].") was processed successfully and updated to indicate it was successfully processed\n";
+
+				//**UPDATE: commit the transaction
+				
+				//rollback the transaction:
+				$GLOBALS['pdo']->commit();
+
+				
+				//begin the new transaction:
+				$GLOBALS['pdo']->beginTransaction();
+
+			}					
+			else
+			{
+				//the owner was NOT processed successfully:
+				echo "owner record (".$owner_info['login'].") was NOT processed successfully, rollback the transaction\n";
+				
+				//rollback the transaction:
+				$GLOBALS['pdo']->rollback();
+				
+				$return_value = false;
+			}
+		}
+	}
+	else
+	{
+		//the query was not successfully executed
+		return false;
+	}
+	
+
+	echo "reprocess_owners() is finished executing\n\n";
+
+	return $return_value;
+}
+
+
+
+
+
+
+//function that queries the DB for all repos that have not been marked as processed yet and process those recs in a loop using process_repo()
+
+
+//function that queries the DB for all repos that have not been marked as processed yet and process those recs in a loop using repo_request_loop()
+function reprocess_repos ()
+{
+	echo "running reprocess_repos()\n";
+	//initialize the return value
+	$return_value = true;
+	
+	$query = "select source_repo_id id, name, full_name, repo_html_url, source_owner_id, login, owner_html_url, owner_type type from ghnd_owner_repos_v where repo_processed_yn = 0";
+
+	// prepare the statement. the placeholders allow PDO to handle substituting
+	// the values, which also prevents SQL injection
+	$stmt = $GLOBALS['pdo']->prepare($query);
+
+
+	//execute the query
+	if ($stmt->execute())
+	{
+		//the query was successfully executed
+		
+		//retrieve the repo records using repo_request_loop:
+		while ($repo_info = $stmt->fetch(PDO::FETCH_ASSOC)) 
+		{
+			
+			//transform the repo/owner results into a nested array like the json for a repo:
+			transform_repo_results ($repo_info);
+			
+			echo "process the current repo is: ".$repo_info['login']."\n";
+			if (process_repo($repo_info, $owner_id, $repo_id))
+			{
+				//the repo was processed successfully:
+				echo "the repo record (".$repo_info['full_name'].") was processed successfully and updated to indicate it was successfully processed\n";
+
+				//**UPDATE: commit the transaction
+				
+				//rollback the transaction:
+				$GLOBALS['pdo']->commit();
+
+				
+				//begin the new transaction:
+				$GLOBALS['pdo']->beginTransaction();
+
+			}					
+			else
+			{
+				//the repo was NOT processed successfully:
+				echo "repo record (".$repo_info['full_name'].") was NOT processed successfully, rollback the transaction\n";
+				
+				//rollback the transaction:
+				$GLOBALS['pdo']->rollback();
+				
+				$return_value = false;
+			}
+		}
+	}
+	else
+	{
+		//the query was not successfully executed
+		return false;
+	}
+	
+
+	echo "reprocess_repos() is finished executing\n\n";
+
+	return $return_value;
+}
+
+
+
+
 //function that returns true if the owner has been processed in this script execution or if the repo is marked as being successfully processed and false if not:
 function owner_processed ($owner_info)
 {
@@ -111,6 +267,8 @@ function curl_request($url, &$curl_response, &$http_code)
 
 	
 	echo "the value of HTTP status code is: ".$curl->getHttpStatusCode()."\n";
+	//set the http_code to the HTTP code returned by the curl response
+	$http_code = $curl->getHttpStatusCode();
 
 	if ($curl->error) {
 		$curl->diagnose();
@@ -212,91 +370,34 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 			for ($i = 0; $i < count($json_object) && $i < 3; $i ++)
 //			for ($i = 0; $i < count($json_object); $i ++)
 			{
-				echo "The value of the current owner is: ".$json_object[$i]['login']."\n";
+				//since this is an owner loop it doesn't specify certain pieces of information like type and html_url
+				$owner_info['type'] = $owner_type;
+				$owner_info['html_url'] = "https://github.com/".$json_object[$i]['login'];
 
-
-				//check if the current owner id has been processed in this current execution yet:
-				if (!owner_processed($json_object[$i]))
+				echo "process the current owner is: ".$json_object[$i]['login']."\n";
+				if (process_owner($json_object[$i]))
 				{
-					//the current owner id has not been processed in this current execution yet, process it now:
-					echo "the current owner id has not been processed in this current execution or previous execution yet, process it now\n";
+					//the owner was processed successfully:
+					echo "owner record was processed successfully and updated to indicate it was successfully processed\n";
+
+					//**UPDATE: commit the transaction
 					
-					//set the current owner json array for the owner_type array element based on the value of $owner_type 
-					$json_object[$i]['type'] = $owner_type;
-					$json_object[$i]['html_url'] = "https://github.com/".$json_object[$i]['login'];
+					//rollback the transaction:
+					$GLOBALS['pdo']->commit();
+
 					
+					//begin the new transaction:
+					$GLOBALS['pdo']->beginTransaction();
 
-					//attempt to process the owner
-					if (process_owner_record($json_object[$i], $owner_id))
-					{
-						//request all the repos associated with the org, starting with the first page with a maximum of 100 repos per page:
-						if (repo_request_loop($json_object[$i]['repos_url']."?per_page=100", $owner_id))
-						{
-							//the repo_request_loop for the current owner was processed successfully
-							echo "the repo_request_loop for the current owner was processed successfully\n";
-						
-							//commit the transaction here and update the owner record to indicate it has been processed:
-							if (update_owner_processed_yn ($owner_id))
-							{
-								//the owner record was updated successfully
-								echo "owner record was updated to indicate it was successfully processed\n";
-								
-								
-								//**UPDATE: commit the transaction
-								
-								//rollback the transaction:
-								$GLOBALS['pdo']->commit();
-
-								
-								//begin the new transaction:
-								$GLOBALS['pdo']->beginTransaction();
-								
-							}
-							else
-							{
-								//the owner record could not be updated successfully
-								echo "the owner record could not be updated successfully\n";
-								
-								//rollback the transaction:
-								$GLOBALS['pdo']->rollback();
-								return false;
-								
-							}
-					
-						}
-						else
-						{
-							//the repo_request_loop for the current owner was NOT processed successfully
-							echo "the repo_request_loop for the current owner was NOT processed successfully\n";
-							
-							//rollback the transaction:
-							$GLOBALS['pdo']->rollback();
-							
-							return false;
-							
-						}
-					}
-					else
-					{
-						//the current owner could not be processed successfully
-						echo "the current owner could not be processed successfully\n";
-
-						//rollback the transaction:
-						$GLOBALS['pdo']->rollback();
-
-
-						return false;
-					}
-				}
+				}					
 				else
 				{
-					//the current owner has already been processed, skip the current owner:
+					//the owner was NOT processed successfully:
+					echo "owner record was NOT processed successfully, rollback the transaction\n";
 					
-					echo "the current owner has already been processed, skip the current owner\n";					
-					
-					
+					//rollback the transaction:
+					$GLOBALS['pdo']->rollback();
 				}
-
 			}
 			
 			//check if the next_link_url is defined
@@ -347,7 +448,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 }
 
 //recursive function that loops through the repos for a given org or user identified by id 
-function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = null)
+function repo_request_loop($request_url, &$http_404_error, $owner_id = null, $parent_repo_id = null)
 {
 	echo "\n\n running repo_request_loop ($request_url, $owner_id, $parent_repo_id)\n";
 
@@ -474,7 +575,18 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 	{
 		echo "Error - The curl request was unsuccessful\n";
 
-		//the app had a runtime error, return false
+		//the app had a curl request error, return false
+
+		//check if the http code is = 404:
+		if ($http_code == 404)
+		{
+			
+			//this is an http 404 error, set the variable value
+			$http_404_error = true;
+
+			echo "this is an http 404 error, set the variable value to true (".var_export($http_404_error, true)."\n";
+
+		}
 		return false;
 	}
 
@@ -487,7 +599,7 @@ function insert_owner ($owner_info, &$owner_id)
 {
 	echo "running insert_owner(".var_export($owner_info['login'], true).", \$owner_id)\n";
 
-	$query = "insert into ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
+	$query = "insert into ghnd_owners (source_owner_id, login, owner_html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
 
 //	echo "the value of \$query is: $query\n";
 
@@ -575,15 +687,11 @@ function owner_exists($owner_info, &$owner_db_info)
 	return $return_value;
 }
 
-
-
-
-
 function insert_repo ($repo_info, $owner_id, &$repo_id)
 {
 	echo "\nrunning insert_repo(".var_export($repo_info['full_name'], true).", \$repo_id)\n";
 
-	$query = "insert into ghnd_repos (source_repo_id, repo_name, full_name, repo_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :repo_name, :full_name, :repo_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
+	$query = "insert into ghnd_repos (source_repo_id, name, full_name, repo_html_url, topics, created_at, updated_at, owner_id, parent_repo_id) VALUES (:source_repo_id, :name, :full_name, :html_url, :topics, STR_TO_DATE(:created_at,'%Y-%m-%dT%H:%i:%sZ'), STR_TO_DATE(:updated_at,'%Y-%m-%dT%H:%i:%sZ'), :owner_id, :parent_repo_id)";
 
 //	echo "the value of \$query is: $query\n";
 
@@ -597,9 +705,9 @@ function insert_repo ($repo_info, $owner_id, &$repo_id)
 
 	//bind the insert query variables:
 	$stmt->bindValue(":source_repo_id", $repo_info['id']);
-	$stmt->bindValue(":repo_name", $repo_info['name']);
+	$stmt->bindValue(":name", $repo_info['name']);
 	$stmt->bindValue(":full_name", $repo_info['full_name']);
-	$stmt->bindValue(":repo_url", $repo_info['html_url']);
+	$stmt->bindValue(":html_url", $repo_info['html_url']);
 	$stmt->bindValue(":created_at", $repo_info['created_at']);
 	$stmt->bindValue(":updated_at", $repo_info['updated_at']);
 	$stmt->bindValue(":parent_repo_id", $repo_info['parent_repo_id']);
@@ -754,6 +862,86 @@ function connect_mysql (&$pdo)
 
 	
 }
+
+//this function processes a given owner record
+function process_owner($owner_info)
+{
+	echo "running process_owner (".var_export($owner_info, true).")\n";
+	
+	
+	//initialize the $return_value variable value:
+	$return_value = true;
+	
+	
+	//check if the current owner id has been processed in this current or previous execution yet:
+	if (!owner_processed($owner_info))
+	{
+		//the current owner id has not been processed in this current execution or previous execution yet, process it now:
+
+		echo "the current owner id has not been processed in this current execution or previous execution yet, process it now\n";
+		
+		//set the current owner json array for the owner_type array element based on the value of $owner_type 
+	
+
+		//attempt to process the owner
+		if (process_owner_record($owner_info, $owner_id))
+		{
+			
+			//initialize the owner repo 404 error variable that is passed by reference to the repo_request_loop() function
+			$owner_repo_404_http_error = false;
+			
+			//request all the repos associated with the org, starting with the first page with a maximum of 100 repos per page:
+			if (repo_request_loop($owner_info['repos_url']."?per_page=100", $owner_repo_404_http_error, $owner_id))
+			{
+				//the repo_request_loop for the current owner was processed successfully
+				echo "the repo_request_loop for the current owner was processed successfully\n";
+			
+				//commit the transaction here and update the owner record to indicate it has been processed:
+				if (update_owner_processed_yn ($owner_id))
+				{
+					//the owner record was updated successfully
+					echo "owner record was updated to indicate it was successfully processed\n";
+				}
+				else
+				{
+					//the owner record could not be updated successfully
+					echo "the owner record could not be updated successfully\n";
+					
+					return false;
+				}
+		
+			}
+			else
+			{
+				//the repo_request_loop for the current owner was NOT processed successfully
+				echo "the repo_request_loop for the current owner was NOT processed successfully\n";
+				
+				return false;
+				
+			}
+		}
+		else
+		{
+			//the current owner could not be processed successfully
+			echo "the current owner could not be processed successfully\n";
+
+			return false;
+		}
+	}
+	else
+	{
+		//the current owner has already been processed, skip the current owner:
+		
+		echo "the current owner has already been processed, skip the current owner\n";
+	}
+	
+	
+	return $return_value;
+}
+
+
+
+
 
 //this function will determine if an owner record exists for the $owner_info array that contains the owner information. If the owner record exists then the database owner_id will be returned.  If the owner record does not exist then it will be inserted intothe DB and the owner_id will be returned:
 function process_owner_record ($owner_info, &$owner_id)
@@ -930,19 +1118,22 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 					//***the owner of a forked repository is an interesting node, check for all repositories for the owner now that the owner record exists
 					
+
+
+					//initialize the parent owner repo 404 error variable that is passed by reference to the repo_request_loop() function
+					$parent_owner_repo_404_http_error = false;
 					
 					echo "recursively process all of the parent repo's owner's (".$single_repo_json_object['parent']['owner']['login'].") repos\n";
 					
 					//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
-					if (repo_request_loop ($single_repo_json_object['parent']['owner']['repos_url']."?per_page=100", $parent_owner_id))
+					if (repo_request_loop ($single_repo_json_object['parent']['owner']['repos_url']."?per_page=100", $parent_owner_repo_404_http_error, $parent_owner_id))
 					{
 						//the parent repo's owner repo request loop was successful
 						echo "the parent repo's owner repo request loop was successful\n";
-						
 					}
 					else
 					{
-						//the repo_request_loop failed
+						//the parent owner repo_request_loop failed
 						
 						echo "the parent repo's owner (".$single_repo_json_object['parent']['owner']['login'].") repo request loop was NOT successful\n";
 						
@@ -1032,8 +1223,12 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 			
 			//query for the repos that were forked from the current repo and insert them using the repo loop query except call it with owner_id = NULL so the owner will be determined by parsing the repo's fork data:
 			
+			//initialize the fork url 404 error variable that is passed by reference to the repo_request_loop() function
+			$fork_404_http_error = false;
+			
+			
 			//process the current repo's forks and provide the $repo_id as the parent_repo_id of all the associated forked repos
-			if (repo_request_loop($repo_info['forks_url']."?per_page=100", null, $repo_id))
+			if (repo_request_loop($repo_info['forks_url']."?per_page=100", $fork_404_http_error, null, $repo_id))
 			{
 				//the repo's fork repo request loop was successful
 				echo "the repo's fork repo request loop was successful\n";
@@ -1042,23 +1237,33 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 			else
 			{
 				//the repo's fork repo request loop was NOT successful
+				echo "the repo's fork repo request loop was NOT successful, the value of \$fork_404_http_error is: ".var_export($fork_404_http_error, true)."\n";
+				
 				
 				
 				//check if this is due to a 404 HTTP return code and if the $parent_repo_id is set
-					//if the repo was not processed successfully due to a 404 code on the forks url request then commit the transaction but don't set the processed_yn flag to 1 so it can be reprocessed at a later date
+				if ($fork_404_http_error)
+				{
+					//the repo forks were not processed due to a 404 error where the parent_repo_id is set, allow the transaction for the repo to be committed and set repo_processed_yn = 1 since this 404 error will keep occurring and the rest of the processing was successful
 					
-					
-				
-				
-				
-				
-				echo "the repo's (".$repo_info['full_name'].") fork repo request loop was NOT successful\n";
-				
-				//rollback the transaction:
-//							$GLOBALS['pdo']->rollback();
 			
-				//the app had a database error, return false to indicate the function call failed
-				return false;
+					echo "due to a 404 error the repo's (".$repo_info['full_name'].") fork repo request loop was NOT successful, ignore the error since it was just the fork url loop that failed\n";
+				}
+				else
+				{
+					//the repo forks were not processed due to a non-404 error
+					
+				
+					echo "the repo's (".$repo_info['full_name'].") fork repo request loop was NOT successful\n";
+				
+				
+					
+					//rollback the transaction:
+	//							$GLOBALS['pdo']->rollback();
+				
+					//the app had a database error, return false to indicate the function call failed
+					return false;
+				}
 			}
 		}
 		
