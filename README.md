@@ -61,8 +61,41 @@ R: calculate all metrics for the network and compare to random networks to deter
 Gephi: visualize with standard method
 
 
+bipartite graph?
+temporal -> no time to do it myself, but there is time to requery the graph and compare the two sets of nodes/links
 
 
+
+
+
+
+
+
+
+
+
+known issues:
+	github returns a 404 response for certain users/repos when the user is queried directly 
+		Example: 
+			"url": "https://api.github.com/users/world-admin"
+			"html_url": "https://github.com/world-admin" 
+			"forks_url": "https://api.github.com/repos/world-admin/aiohttp-demos/forks"
+			
+		To handle this issue a repo will continue to be processed even if the forks url returns a 404 code but it will not be marked as processed_yn = 1 because the forks were not processed.  
+
+
+
+
+_ code optimization:
+	when I store the repo/owner source id also save the corresponding DB ID too? -> we may not have it yet if it hasn't been processed yet
+		This would save a query when the DB ID has been processed
+			can also add the ID to the global array even if it has been processed before so it won't keep checking
+
+
+
+
+how to handle the fork url failures?
+	We want to be able to skip the current repo and move on
 
 
 
@@ -127,7 +160,18 @@ to do:
 			
 	_ check if we can get rid of type for owners in the processing code (DB only)
 		these are likely unique ids for both sets of objects combined
-			
+
+
+
+	_ ** how do we handle 404 responses?
+		Just continue to process the other repos/owners but don't update the repo/owner with processed_yn = 1?
+		
+		repo_request_loop() is running with parent_repo_id = X then we can ignore the problem and just not update the current repo as processed_yn = 1
+			//we know this is a fork url processing
+
+
+
+			if repo_request_loop() is running with 
 
 	
 	

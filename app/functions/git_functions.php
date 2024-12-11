@@ -12,9 +12,9 @@ $processed_repo_ids = array();
 
 
 //function that returns true if the owner has been processed in this script execution or if the repo is marked as being successfully processed and false if not:
-function owner_processed ($source_owner_id)
+function owner_processed ($owner_info)
 {
-	echo "running owner_processed ($source_owner_id)\n";
+	echo "running owner_processed (".$owner_info['login'].")\n";
 	
 	
 	$return_value = true;
@@ -22,7 +22,7 @@ function owner_processed ($source_owner_id)
 	//check if the owner has been processed yet (in the current processing attempt)
 	echo "check if the owner has been processed yet (in the current processing attempt)\n";
 	
-	if ($return_value = in_array($source_owner_id, $GLOBALS['processed_owner_ids']))
+	if ($return_value = in_array($owner_info['id'], $GLOBALS['processed_owner_ids']))
 	{
 		//the owner record has been processed in the current processing attempt
 		echo "the owner record has been processed in the current processing attempt\n";
@@ -32,7 +32,7 @@ function owner_processed ($source_owner_id)
 		//check if the owner has been processed yet (indicated in the database)
 		echo "check if the owner has been processed yet (indicated in the database)\n";
 		//query the database
-		if ($return_value = owner_exists(array("id"=>$source_owner_id), $owner_db_info))
+		if ($return_value = owner_exists(array("id"=>$owner_info['id'], "login"=>$owner_info['login']), $owner_db_info))
 		{
 			//the owner has already been processed:
 			echo "the owner record exists in the DB, \$owner_db_info['owner_processed_yn'] is: ".$owner_db_info['owner_processed_yn']."\n";
@@ -46,7 +46,7 @@ function owner_processed ($source_owner_id)
 			
 			echo "the owner has not been processed yet, add it to the global variable \$processed_owner_ids to indicate it has been initiated for processing";
 			
-			$GLOBALS['processed_owner_ids'][] = $source_owner_id;
+			$GLOBALS['processed_owner_ids'][] = $owner_info['id'];
 		}
 	}
 	return $return_value;
@@ -56,16 +56,16 @@ function owner_processed ($source_owner_id)
 
 
 //function that returns true if the repo has been processed in this script execution or if the repo is marked as being successfully processed and false if not:
-function repo_processed ($source_repo_id)
+function repo_processed ($repo_info)
 {
-	echo "running repo_processed ($source_repo_id)\n";
+	echo "running repo_processed (".$repo_info['full_name'].")\n";
 	
 	$return_value = true;
 	
 	//check if the repo has been processed yet (in the current processing attempt)
 	echo "check if the repo has been processed yet (in the current processing attempt)\n";
 	
-	if ($return_value = in_array($source_repo_id, $GLOBALS['processed_repo_ids']))
+	if ($return_value = in_array($repo_info['id'], $GLOBALS['processed_repo_ids']))
 	{
 		//the repo record has been processed in the current processing attempt
 		echo "the repo record has been processed in the current processing attempt\n";
@@ -75,7 +75,7 @@ function repo_processed ($source_repo_id)
 		//check if the repo has been processed yet (indicated in the database)
 		echo "check if the repo has been processed yet (indicated in the database)\n";
 		//query the database
-		if ($return_value = repo_exists(array("id"=>$source_repo_id), $repo_db_info))
+		if ($return_value = repo_exists(array("id"=>$repo_info['id']), $repo_db_info))
 		{
 			echo "the repo record exists in the DB, \$repo_db_info['repo_processed_yn'] is: ".$repo_db_info['repo_processed_yn']."\n";
 		
@@ -89,7 +89,7 @@ function repo_processed ($source_repo_id)
 			
 			echo "the repo has not been processed yet, add it to the global variable \$processed_repo_ids to indicate it has been initiated for processing";
 			
-			$GLOBALS['processed_repo_ids'][] = $source_repo_id;
+			$GLOBALS['processed_repo_ids'][] = $repo_info['id'];
 		}
 	}
 	return $return_value;
@@ -97,7 +97,7 @@ function repo_processed ($source_repo_id)
 
 $api_request_counter = 0;
 
-function curl_request($url, &$curl_response)
+function curl_request($url, &$curl_response, &$http_code)
 {
 	
 	
@@ -109,9 +109,17 @@ function curl_request($url, &$curl_response)
 
 	$curl->get($url);
 
+	
+	echo "the value of HTTP status code is: ".$curl->getHttpStatusCode()."\n";
+
 	if ($curl->error) {
 		$curl->diagnose();
 		echo 'Error: ' . $curl->errorMessage . "\n";
+		
+		
+		echo "response headers are: ".var_export($curl->responseHeaders, true)."\n";
+
+		
 	} else {
 		$curl_response = $curl->response;
 	}
@@ -184,7 +192,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 	}
 	
 	//send the curl request for the owners:
-	if (curl_request($request_url, $curl_response))
+	if (curl_request($request_url, $curl_response, $http_code))
 	{
 
 //		echo $curl_response;
@@ -208,14 +216,11 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 
 
 				//check if the current owner id has been processed in this current execution yet:
-				if (!owner_processed($json_object[$i]['id']))
+				if (!owner_processed($json_object[$i]))
 				{
 					//the current owner id has not been processed in this current execution yet, process it now:
 					echo "the current owner id has not been processed in this current execution or previous execution yet, process it now\n";
 					
-					//add the current owner_id to the list of processed owner_ids 
-					$GLOBALS['processed_owner_ids'][] = $json_object[$i]['id'];
-
 					//set the current owner json array for the owner_type array element based on the value of $owner_type 
 					$json_object[$i]['type'] = $owner_type;
 					$json_object[$i]['html_url'] = "https://github.com/".$json_object[$i]['login'];
@@ -354,7 +359,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 	$return_value = true;
 	
 	//send the curl request for the repos:
-	if (curl_request($request_url, $curl_response))
+	if (curl_request($request_url, $curl_response, $http_code))
 	{
 		//the repos request was successful:
 
@@ -380,7 +385,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 
 
 				//check if the current repo id has been processed in this current execution yet:
-				if (!repo_processed($json_object[$i]['id']))
+				if (!repo_processed($json_object[$i]))
 				{
 					//the current repo id has not been processed in this current execution or in a previous execution yet, process it now:
 					echo "the current repo id has not been processed in this current execution or previous execution yet, process it now\n";
@@ -424,7 +429,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 					{
 						//the current repo was NOT processed successfully
 						
-						echo "the current repo was NOT processed successfully\n";
+						echo "the current repo (".$json_object[$i]['full_name'].") was NOT processed successfully\n";
 
 						return false;
 					}
@@ -480,7 +485,7 @@ function repo_request_loop($request_url, $owner_id = null, $parent_repo_id = nul
 //function that inserts an owner record based on the values defined in the $owner_info array
 function insert_owner ($owner_info, &$owner_id)
 {
-	echo "running insert_owner(".var_export($owner_info['id'], true).", \$owner_id)\n";
+	echo "running insert_owner(".var_export($owner_info['login'], true).", \$owner_id)\n";
 
 	$query = "insert into ghnd_owners (source_owner_id, login, html_url, owner_type) VALUES (:source_owner_id, :login, :html_url, :owner_type)";
 
@@ -525,7 +530,7 @@ function owner_exists($owner_info, &$owner_db_info)
 	//initialize the value of $owner_id
 	$owner_id = null;
 
-	echo "\nrunning owner_exists(".var_export($owner_info['id'], true).", \$owner_id)\n";
+	echo "\nrunning owner_exists(".var_export($owner_info['login'], true).", \$owner_id)\n";
 	
 	$query = "select * from ghnd_owners where source_owner_id = :source_owner_id";
 	
@@ -754,7 +759,7 @@ function connect_mysql (&$pdo)
 function process_owner_record ($owner_info, &$owner_id)
 {
 	
-	echo "\nrunning process_owner_record (".$owner_info['id'].", $owner_id)\n";
+	echo "\nrunning process_owner_record (".var_export($owner_info, true).", $owner_id)\n";
 	$return_value = true;
 	$owner_id = null;
 	
@@ -838,7 +843,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 
 			//request the current repository's detailed information:
-			if (curl_request($repo_info['url'], $single_repo_curl_response))
+			if (curl_request($repo_info['url'], $single_repo_curl_response, $http_code))
 			{
 				//the single repo curl request was successful
 				echo "the single repo curl request was successful\n";
@@ -882,7 +887,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 						}
 						else
 						{
-							//the parent repo's parent repo could not be processed
+							//the parent repo's (".$single_repo_json_object['parent']['full_name'].") parent repo could not be processed
 							
 							echo "the parent repo's parent repo could not be processed\n";
 							
@@ -939,7 +944,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 					{
 						//the repo_request_loop failed
 						
-						echo "the parent repo's owner repo request loop was NOT successful\n";
+						echo "the parent repo's owner (".$single_repo_json_object['parent']['owner']['login'].") repo request loop was NOT successful\n";
 						
 						//rollback the transaction:
 //									$GLOBALS['pdo']->rollback();
@@ -985,7 +990,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 			//insert the repo
 			if (insert_repo($repo_info, $owner_id, $repo_id))
 			{
-				echo "The repo was inserted successfully\n";
+				echo "The repo (".$repo_info['full_name'].") was inserted successfully\n";
 			}
 			else
 			{
@@ -1038,7 +1043,16 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 			{
 				//the repo's fork repo request loop was NOT successful
 				
-				echo "the repo's fork repo request loop was NOT successful\n";
+				
+				//check if this is due to a 404 HTTP return code and if the $parent_repo_id is set
+					//if the repo was not processed successfully due to a 404 code on the forks url request then commit the transaction but don't set the processed_yn flag to 1 so it can be reprocessed at a later date
+					
+					
+				
+				
+				
+				
+				echo "the repo's (".$repo_info['full_name'].") fork repo request loop was NOT successful\n";
 				
 				//rollback the transaction:
 //							$GLOBALS['pdo']->rollback();
