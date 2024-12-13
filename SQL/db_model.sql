@@ -2,6 +2,10 @@ DROP TABLE ghnd_repos;
 drop table ghnd_owners;
 drop view ghnd_owner_repos_v;
 drop view ghnd_parent_child_owner_repos_v;
+drop view parent_repo_count_v;
+drop view repo_summ_v;
+drop view owner_summ_v;
+
 
 CREATE TABLE `github_network`.`ghnd_owners` (
   `owner_id` INT NOT NULL AUTO_INCREMENT COMMENT 'Unique numeric primary key',
@@ -100,8 +104,279 @@ parent_owner_repos.repo_id = child_owner_repos.parent_repo_id
 order by parent_owner_repos.owner_type, parent_owner_repos.login, parent_owner_repos.name, child_owner_repos.owner_type, child_owner_repos.login, child_owner_repos.name; 
 
 
+/*implement summary reports
+
+	summary by parent repo
+	
+	do we want a hierarchical query that we can use to roll up all the parents?
+	
+	summarize by owner
+		
+	group by owner
+	
+	
+	group by repo
+	
+	
+	
+	
+
+
+*/
+
+
+
+/*implement a network export view so we can construct the gml or graphml file*/
+
+
+/*simple owner summary query that counts each repo and the number or forked repositories*/
+
+/*
+create or replace view owner_summary_v
+as
+	select 
+	count(*) total_repos,
+	SUM(case when ghnd_owners.parent_repo_id is null then 0 else 1 END) forked_child_repos,
+	ghnd_owners.owner_id,
+	ghnd_owners.source_owner_id,
+	ghnd_owners.login,
+	ghnd_owners.owner_html_url,
+	ghnd_owners.owner_type,
+	ghnd_owners.owner_processed_yn
+	from
+	ghnd_owner_repos_v
+	group by
+	ghnd_owners.owner_id,
+	ghnd_owners.source_owner_id,
+	ghnd_owners.login,
+	ghnd_owners.owner_html_url,
+	ghnd_owners.owner_type,
+	ghnd_owners.owner_processed_yn
+	order by ghnd_owners.owner_type, ghnd_owners.login;
+
+*/
+/*
+how do we summarize the parent/child repos without using subqueries?
+
+
+*/
+
+/*
+
+--get the summary information for the repos and then just join it to the owner data
+--get a summary count of each 	
+	--parent-child relationship
+
+
+--if we get the count of the in-degree and the out-degree of each owner that is useful information
+	--get this information at the repo-level and then summarize that 
+	
+	
+	
+*/
+/*this view returns a summary of incoming and outgoing links for a given parent repo*/
+
+create or replace view parent_repo_count_v
+as 
+select 
+parent_owner_id,
+parent_source_owner_id,
+parent_login, 
+parent_owner_html_url, 
+parent_owner_type, 
+parent_owner_processed_yn, 
+parent_repo_id,
+parent_source_repo_id,
+parent_parent_repo_id,
+parent_name, 
+parent_full_name,
+parent_repo_html_url, 
+parent_topics, 
+parent_created_at,
+parent_updated_at, 
+parent_repo_processed_yn,
+count(*) child_repo_count,
+SUM(CASE WHEN child_repo_processed_yn = 1 THEN 1 ELSE 0 END) child_repo_processed_count,
+SUM(CASE WHEN child_repo_processed_yn = 0 THEN 1 ELSE 0 END) child_repo_unprocessed_count
+
+from
+ghnd_parent_child_owner_repos_v
+
+group by 
+parent_owner_id,
+parent_source_owner_id,
+parent_login, 
+parent_owner_html_url, 
+parent_owner_type, 
+parent_owner_processed_yn, 
+parent_repo_id,
+parent_source_repo_id,
+parent_parent_repo_id,
+parent_name, 
+parent_full_name,
+parent_repo_html_url, 
+parent_topics, 
+parent_created_at,
+parent_updated_at, 
+parent_repo_processed_yn
+
+order by parent_owner_type, parent_login
+;	
 
 
 
 
+
+create or replace view repo_summ_v
+
+as
+
+
+select
+ghnd_owner_repos_v.owner_id,
+ghnd_owner_repos_v.source_owner_id,
+ghnd_owner_repos_v.login, 
+ghnd_owner_repos_v.owner_html_url, 
+ghnd_owner_repos_v.owner_type, 
+ghnd_owner_repos_v.owner_processed_yn, 
+ghnd_owner_repos_v.repo_id,
+ghnd_owner_repos_v.source_repo_id,
+ghnd_owner_repos_v.parent_repo_id,
+ghnd_owner_repos_v.name, 
+ghnd_owner_repos_v.full_name,
+ghnd_owner_repos_v.repo_html_url, 
+ghnd_owner_repos_v.topics, 
+ghnd_owner_repos_v.created_at,
+ghnd_owner_repos_v.updated_at, 
+ghnd_owner_repos_v.repo_processed_yn,
+parent_repo_count_v.child_repo_count in_degree,
+parent_repo_count_v.child_repo_processed_count,
+parent_repo_count_v.child_repo_unprocessed_count,
+(CASE WHEN ghnd_owner_repos_v.parent_repo_id IS NOT NULL THEN 1 ELSE 0 END) out_degree
+
+from
+ghnd_owner_repos_v left join 
+parent_repo_count_v on ghnd_owner_repos_v.repo_id = parent_repo_count_v.parent_repo_id
+	
+;	
+
+
+
+
+/*owner summary*/
+
+create or replace view owner_summ_v
+as 
+
+select
+
+repo_summ_v.owner_id,
+repo_summ_v.source_owner_id,
+repo_summ_v.login, 
+repo_summ_v.owner_html_url, 
+repo_summ_v.owner_type, 
+repo_summ_v.owner_processed_yn, 
+repo_summ_v.repo_id,
+repo_summ_v.source_repo_id,
+repo_summ_v.parent_repo_id,
+repo_summ_v.name, 
+repo_summ_v.full_name,
+repo_summ_v.repo_html_url, 
+repo_summ_v.topics, 
+repo_summ_v.created_at,
+repo_summ_v.updated_at, 
+repo_summ_v.repo_processed_yn,
+
+SUM(repo_summ_v.in_degree) owner_in_degree,
+repo_summ_v.child_repo_processed_count,
+repo_summ_v.child_repo_unprocessed_count,
+SUM(repo_summ_v.out_degree) owner_out_degree
+from 
+
+
+repo_summ_v
+group by 
+
+repo_summ_v.owner_id,
+repo_summ_v.source_owner_id,
+repo_summ_v.login, 
+repo_summ_v.owner_html_url, 
+repo_summ_v.owner_type, 
+repo_summ_v.owner_processed_yn, 
+repo_summ_v.repo_id,
+repo_summ_v.source_repo_id,
+repo_summ_v.parent_repo_id,
+repo_summ_v.name, 
+repo_summ_v.full_name,
+repo_summ_v.repo_html_url, 
+repo_summ_v.topics, 
+repo_summ_v.created_at,
+repo_summ_v.updated_at, 
+repo_summ_v.repo_processed_yn
+order by 
+repo_summ_v.owner_type, 
+repo_summ_v.login
+;
+
+	
+
+	/*
+	
+	left join 
+	(select 
+	parent_parent_repo_id repo_id,
+	count(*) num_child_repos,
+	SUM(case when child_repo_processed_yn = 1 THEN 1 ELSE 0 END) child_repos_processed,
+	
+	
+	from 
+	
+	ghnd_parent_child_owner_repos_v
+	where parent_parent_repo_id IS NOT NULL
+	group by ghnd_parent_child_owner_repos_v.parent_parent_repo_id
+	
+	
+	
+	
+	group by ghnd_parent_child_owner_repos_v.parent_repo_id
+	) parent_repo_summ on ghnd_owner_repos_v.parent_repo_id = parent_repo_summ.repo_id
+	
+	left join
+	(select ghnd_parent_child_owner_repos_v) child_repo_summ on ghnd_owner_repos_v.repo_id = child_repo_summ.repo_id
+	
+	
+
+
+
+;
+
+*/
+
+/*
+--get the total number of forked child repos
+
+create or replace view 
+parent_child_owner_repo_summ_v
+as 
+	select 
+	count(*) total_repos,
+	SUM(case when ghnd_owners.parent_repo_id is null then 0 else 1 END) forked_child_repos,
+	ghnd_owners.owner_id,
+	ghnd_owners.source_owner_id,
+	ghnd_owners.login,
+	ghnd_owners.owner_html_url,
+	ghnd_owners.owner_type,
+	ghnd_owners.owner_processed_yn
+	from
+	ghnd_parent_child_owner_repos_v
+	group by
+	ghnd_owners.owner_id,
+	ghnd_owners.source_owner_id,
+	ghnd_owners.login,
+	ghnd_owners.owner_html_url,
+	ghnd_owners.owner_type,
+	ghnd_owners.owner_processed_yn
+	order by ghnd_owners.owner_type, ghnd_owners.login;
+
+*/
 

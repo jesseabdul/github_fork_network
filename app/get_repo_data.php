@@ -51,7 +51,7 @@ else
 	echo "one or more unprocessed repos have not been successfully processed\n";
 }
 
-
+echo "process the owner_request_loop()\n";
 //send the curl request for the organizations:
 if (owner_request_loop('https://api.github.com/organizations?per_page=100', 0, "Organization"))
 {

@@ -51,16 +51,39 @@ forks_count in repo request can be used to find the forked repos
 
 	
 
-## analysis ideas
+## analysis ideas (look at 12/12/24 class)
 qualifying nodes for communities
 
 node merging up to owner level?
 
 R: calculate all metrics for the network and compare to random networks to determine how it's similar or different from random or degree distribution
+	assortativity
+	betweenness, etc.
+	transitivity
+	components
+	
+	
+	
+compare to random models 
+	Gnm
+	rewired
+	configuration model
+	power law?
+	
+look at domain explanations for why it differs from degree distribution random models
+
+
+
+Use RMarkdown, Gephi for the paper
+	Do we need to use Word/Google Docs?
+	
 
 Gephi: visualize with standard method
 
 
+
+calculate communities using different methods
+	louvain, infomap, link communities
 
 look at high degree nodes, look for hubs
 	roll up the 
@@ -70,6 +93,8 @@ bipartite graph?
 temporal -> no time to do it myself, but there is time to requery the graph and compare the two sets of nodes/links
 
 
+Primary School Contacts.Rmd: (43:00) 12/12/24 video
+	Assortativity Computations
 
 
 
@@ -78,6 +103,28 @@ temporal -> no time to do it myself, but there is time to requery the graph and 
 
 _ do we want to commit owners/repos even if they weren't successfully processed?
 	having a processed_yn = 0 will still have the object reprocessed
+
+
+
+
+_ process_repo()
+	run recursively from process_repo on the parent repo (when exists)
+	run in repo_request_loop()
+	
+	
+	//the difference between the reprocess and the repo_request_loop
+	
+	
+	process_repo() checks if the repo has been processed yet, if not then process it
+		check if repo record exists in the DB, if so then do not process it
+		if the repo record does not exist then process it (parent, current repo, child repos)
+		
+	
+_ reprocess_owners() - make sure the owner is marked off as processed
+	_ make sure these are added to the processed_id() array
+
+_ process_repo() -> need to address the existing repo record that still needs to be processed (parent, child, owner repos)
+	
 
 
 known issues:
