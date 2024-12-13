@@ -3,6 +3,8 @@
 include_once (($current_dir = dirname(__FILE__))."/functions/config.php");
 include_once ($current_dir."/functions/git_functions.php");
 
+include_once ($current_dir."/functions/owner_functions.php");
+include_once ($current_dir."/functions/repo_functions.php");
 
 
 
