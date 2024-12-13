@@ -100,7 +100,7 @@ function insert_owner ($owner_info, &$owner_id)
 function process_owner_record ($owner_info, &$owner_id)
 {
 	
-	echo "\nrunning process_owner_record (".var_export($owner_info, true).", $owner_id)\n";
+	echo "\nrunning process_owner_record (".var_export($owner_info['login'], true).", $owner_id)\n";
 	$return_value = true;
 	$owner_id = null;
 	
@@ -316,7 +316,7 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 	}
 	
 	//send the curl request for the owners:
-	if (curl_request($request_url, $json_object, $next_link_url, $http_code))
+	if (curl_request($request_url, $json_object, $next_link_url, $http_code, "owner_".$owner_type."_".$owner_request_counter))
 	{
 		//the curl request and response parsing was successful
 

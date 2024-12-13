@@ -258,7 +258,7 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 
 				//check if the repo_exists should be bypassed and if not request the current repository's detailed information:
-				if (($bypass_repo_exists) || (curl_request($repo_info['url'], $single_repo_json_object, $next_link_url, $http_code)))
+				if (($bypass_repo_exists) || (curl_request($repo_info['url'], $single_repo_json_object, $next_link_url, $http_code, "repo_#".$repo_info['id'])))
 				{
 					//the single repo curl request and response parsing was successful
 
@@ -581,7 +581,7 @@ function repo_request_loop($request_url, &$http_404_error, $owner_id = null, $pa
 	$return_value = true;
 	
 	//send the curl request for the repos:
-	if (curl_request($request_url, $json_object, $next_link_url, $http_code))
+	if (curl_request($request_url, $json_object, $next_link_url, $http_code, "repo_".($GLOBALS['repo_loop_counter']).".txt"))
 	{
 		//the repos request and response parsing was successful:
 
@@ -725,7 +725,7 @@ function reprocess_repos ()
 			
 			//query for the repo info via the API:
 			
-			if (curl_request($db_repo_info['url'], $repo_info, $next_link_url, $http_code))
+			if (curl_request($db_repo_info['url'], $repo_info, $next_link_url, $http_code, "repo_#".$db_repo_info['id']))
 			{
 				//the curl request/response processing was successful
 			

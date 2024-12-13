@@ -12,7 +12,7 @@ $processed_repo_ids = array();
 
 $api_request_counter = 0;
 
-function curl_request($url, &$json_object, &$next_link_url, &$http_code)
+function curl_request($url, &$json_object, &$next_link_url, &$http_code, $request_id = null)
 {
 	$curl = new Curl();
 
@@ -41,7 +41,7 @@ function curl_request($url, &$json_object, &$next_link_url, &$http_code)
 		
 //		echo "The value of \$curl_response is: ".$curl_response."\n";
 
-		file_put_contents($GLOBALS['debug_path']."owner_".$owner_type."_".$owner_request_counter.".txt", $curl_response);
+		file_put_contents($GLOBALS['debug_path'].$request_id.".txt", $curl_response);
 		
 		if ($return_value = parse_json_from_api ($curl_response, $json_object, $next_link_url))
 		{
