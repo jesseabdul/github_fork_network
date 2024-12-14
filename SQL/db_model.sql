@@ -1,10 +1,5 @@
 DROP TABLE ghnd_repos;
 drop table ghnd_owners;
-drop view ghnd_owner_repos_v;
-drop view ghnd_parent_child_owner_repos_v;
-drop view parent_repo_count_v;
-drop view repo_summ_v;
-drop view owner_summ_v;
 
 
 CREATE TABLE `github_network`.`ghnd_owners` (
@@ -380,3 +375,20 @@ as
 
 */
 
+create or replace view 
+repo_processed_summ_v
+as
+select 
+
+SUM(CASE WHEN ghnd_repos.repo_processed_yn = 1 THEN 1 ELSE 0 END) processed_repos,
+SUM(CASE WHEN ghnd_repos.repo_processed_yn = 0 THEN 1 ELSE 0 END) unprocessed_repos
+from ghnd_repos;
+
+create or replace view 
+owner_processed_summ_v
+as
+select 
+
+SUM(CASE WHEN ghnd_owners.owner_processed_yn = 1 THEN 1 ELSE 0 END) processed_owners,
+SUM(CASE WHEN ghnd_owners.owner_processed_yn = 0 THEN 1 ELSE 0 END) unprocessed_owners
+from ghnd_owners;
