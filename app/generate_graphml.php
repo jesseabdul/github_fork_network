@@ -11,8 +11,9 @@ connect_mysql ($pdo);
 //open the template graph file
 $graphml_content = file_get_contents("./template.graphml");
 
-echo "the value of \$graphml_content is: " . $graphml_content."\n";
+//echo "the value of \$graphml_content is: " . $graphml_content."\n";
 
+echo "generate the graphml content for the vertex and edge data\n";
 
 //generate the graphml content for the vertex and edge data
 $graphml_content = str_replace("[EDGE_DATA]", generate_edge_data(), str_replace("[VERTEX_DATA]", generate_vertex_data(), str_replace("[GEN_DATE]", date("m/d/Y"), $graphml_content)));
@@ -29,7 +30,7 @@ $graphml_content = str_replace("[EDGE_DATA]", generate_edge_data(), str_replace(
 echo "save the generated graphml file\n";
 
 //save the generated graphml file:
-file_put_contents("./output/github_forked_repo_network.graphml", $graphml_content);
+file_put_contents("../graphml_output/github_forked_repo_network.".date("Ymd").".graphml", $graphml_content);
 
 
 
@@ -41,7 +42,8 @@ function generate_vertex_data ()
 	$vertex_data_string = '';
 	
 	//query the database for the repos so the vertex data can be generated
-	$query = "select ghnd_owner_repos_v.source_owner_id,
+	$query = "select * from 
+	(select ghnd_owner_repos_v.source_owner_id,
 	ghnd_owner_repos_v.login,
 	ghnd_owner_repos_v.owner_html_url,
 	ghnd_owner_repos_v.owner_type,
@@ -50,18 +52,44 @@ function generate_vertex_data ()
 	ghnd_owner_repos_v.full_name repo_full_name,
 	ghnd_owner_repos_v.repo_html_url,
 	ghnd_owner_repos_v.topics,
-	ghnd_owner_repos_v.created_at created_at,
-	ghnd_owner_repos_v.updated_at updated_at
+	DATE_FORMAT(ghnd_owner_repos_v.created_at, '%m/%d/%Y') created_at,
+	DATE_FORMAT(ghnd_owner_repos_v.updated_at, '%m/%d/%Y') updated_at
 	from ghnd_owner_repos_v
 	
-	/*only include repos that have been completely processed*/
-	
 	WHERE 
+	/*only include repos that have been completely processed*/
 	ghnd_owner_repos_v.repo_processed_yn = 1 
-	/*AND ghnd_owner_repos_v.owner_processed_yn = 1 */
+
+	/*only include repos that have a connection to a parent repo*/
+	AND ghnd_owner_repos_v.parent_repo_id IS NOT NULL
 	
-	ORDER BY ghnd_owner_repos_v.login,
-	ghnd_owner_repos_v.name";
+	/*AND ghnd_owner_repos_v.owner_processed_yn = 1 */
+
+
+	UNION
+
+	/*include only distinct parent repos that have at least one child repo*/
+	select DISTINCT
+	ghnd_parent_child_owner_repos_v.parent_source_owner_id source_owner_id,
+	ghnd_parent_child_owner_repos_v.parent_login login,
+	ghnd_parent_child_owner_repos_v.parent_owner_html_url owner_html_url,
+	ghnd_parent_child_owner_repos_v.parent_owner_type owner_type,
+	ghnd_parent_child_owner_repos_v.parent_source_repo_id source_repo_id,
+	ghnd_parent_child_owner_repos_v.parent_name repo_name,
+	ghnd_parent_child_owner_repos_v.parent_full_name repo_full_name,
+	ghnd_parent_child_owner_repos_v.parent_repo_html_url repo_html_url,
+	ghnd_parent_child_owner_repos_v.parent_topics topics,
+	DATE_FORMAT(ghnd_parent_child_owner_repos_v.parent_created_at, '%m/%d/%Y') created_at,
+	DATE_FORMAT(ghnd_parent_child_owner_repos_v.parent_updated_at, '%m/%d/%Y') updated_at
+	from
+	ghnd_parent_child_owner_repos_v 
+	
+	where ghnd_parent_child_owner_repos_v.child_parent_repo_id IS NOT NULL
+	AND ghnd_parent_child_owner_repos_v.parent_repo_processed_yn = 1
+	) child_parent_repos
+
+	ORDER BY login,
+	repo_name";
 	
 
 	// prepare the statement. the placeholders allow PDO to handle substituting
@@ -107,7 +135,9 @@ function generate_edge_data()
 	$query = "select
 	child_source_repo_id, 
 	parent_source_repo_id
-	from ghnd_parent_child_owner_repos_v where parent_repo_processed_yn = 1 AND child_repo_processed_yn = 1";
+	from ghnd_parent_child_owner_repos_v 
+	where parent_repo_processed_yn = 1
+	AND child_repo_processed_yn = 1";
 	
 
 	// prepare the statement. the placeholders allow PDO to handle substituting

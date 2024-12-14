@@ -50,6 +50,15 @@ processing:
 forks_count in repo request can be used to find the forked repos
 
 	
+	
+	
+	
+business rules:
+	_ graphml file is saved in the /graphml_output folder (with date from runtime)
+	_ each API request is saved to the app/debug folder as a .txt file to help with troubleshooting
+	
+	
+	
 
 ## analysis ideas (look at 12/12/24 class)
 qualifying nodes for communities
@@ -63,6 +72,9 @@ R: calculate all metrics for the network and compare to random networks to deter
 	components
 	
 	
+make a note of how many isolates were filtered out but don't include them in the network
+
+
 	
 compare to random models 
 	Gnm
