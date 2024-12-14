@@ -43,27 +43,29 @@ function generate_vertex_data ()
 	
 	//query the database for the repos so the vertex data can be generated
 	$query = "select * from 
-	(select ghnd_owner_repos_v.source_owner_id,
-	ghnd_owner_repos_v.login,
-	ghnd_owner_repos_v.owner_html_url,
-	ghnd_owner_repos_v.owner_type,
-	ghnd_owner_repos_v.source_repo_id,
-	ghnd_owner_repos_v.name repo_name,
-	ghnd_owner_repos_v.full_name repo_full_name,
-	ghnd_owner_repos_v.repo_html_url,
-	ghnd_owner_repos_v.topics,
-	DATE_FORMAT(ghnd_owner_repos_v.created_at, '%m/%d/%Y') created_at,
-	DATE_FORMAT(ghnd_owner_repos_v.updated_at, '%m/%d/%Y') updated_at
-	from ghnd_owner_repos_v
+	(select ghnd_parent_child_owner_repos_v.child_source_owner_id,
+	ghnd_parent_child_owner_repos_v.child_login login,
+	ghnd_parent_child_owner_repos_v.child_owner_html_url owner_html_url,
+	ghnd_parent_child_owner_repos_v.child_owner_type owner_type,
+	ghnd_parent_child_owner_repos_v.child_source_repo_id source_repo_id,
+	ghnd_parent_child_owner_repos_v.child_name repo_name,
+	ghnd_parent_child_owner_repos_v.child_full_name repo_full_name,
+	ghnd_parent_child_owner_repos_v.child_repo_html_url repo_html_url,
+	ghnd_parent_child_owner_repos_v.child_topics topics,
+	DATE_FORMAT(ghnd_parent_child_owner_repos_v.child_created_at, '%m/%d/%Y') created_at,
+	DATE_FORMAT(ghnd_parent_child_owner_repos_v.child_updated_at, '%m/%d/%Y') updated_at
+	from ghnd_parent_child_owner_repos_v
+	
 	
 	WHERE 
 	/*only include repos that have been completely processed*/
-	ghnd_owner_repos_v.repo_processed_yn = 1 
+	ghnd_parent_child_owner_repos_v.child_repo_processed_yn = 1 
+	AND ghnd_parent_child_owner_repos_v.parent_repo_processed_yn = 1 
 
 	/*only include repos that have a connection to a parent repo*/
-	AND ghnd_owner_repos_v.parent_repo_id IS NOT NULL
+	AND ghnd_parent_child_owner_repos_v.child_parent_repo_id IS NOT NULL
 	
-	/*AND ghnd_owner_repos_v.owner_processed_yn = 1 */
+	/*AND ghnd_parent_child_owner_repos_v.owner_processed_yn = 1 */
 
 
 	UNION
@@ -84,7 +86,8 @@ function generate_vertex_data ()
 	from
 	ghnd_parent_child_owner_repos_v 
 	
-	where ghnd_parent_child_owner_repos_v.child_parent_repo_id IS NOT NULL
+	where 
+	ghnd_parent_child_owner_repos_v.child_repo_processed_yn = 1
 	AND ghnd_parent_child_owner_repos_v.parent_repo_processed_yn = 1
 	) child_parent_repos
 
