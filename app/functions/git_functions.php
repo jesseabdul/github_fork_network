@@ -71,6 +71,8 @@ function curl_request($url, &$json_object, &$next_link_url, &$http_code, $reques
 	
 	unset($curl_response);
 	
+	unset($curl);
+	
 	return $return_value;
 }
 

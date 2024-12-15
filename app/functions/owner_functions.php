@@ -358,6 +358,9 @@ function owner_request_loop ($request_url, $owner_request_counter, $owner_type =
 				$GLOBALS['pdo']->beginTransaction();
 
 			}
+			
+			//release the current json object from memory
+			$json_object[$i] = null;
 		}
 		
 		//check if the next_link_url is defined
@@ -457,6 +460,9 @@ function reprocess_owners ()
 				$return_value = false;
 			}
 		}
+		
+		//release the statement from memory
+		unset($stmt);
 	}
 	else
 	{

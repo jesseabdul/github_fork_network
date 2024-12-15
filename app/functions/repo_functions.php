@@ -277,8 +277,6 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 					
 					//parse the parent object to get the owner and the repo
 
-			//		echo $single_repo_curl_response;
-//					file_put_contents($GLOBALS['debug_path']."repo_#".$repo_info['id'].".txt", $single_repo_curl_response);
 
 
 //					echo "saved the contents in a text file: ".$GLOBALS['debug_path']."repo_#".$repo_info['id'].".txt\n";
@@ -287,8 +285,6 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 //					echo "The value of \$single_repo_json_object is: " . var_export($single_repo_json_object, true)."\n";
 
-					//release the long json string variable from memory
-					unset($single_repo_curl_response);
 					
 					echo "The parent repository name is: ".$single_repo_json_object['parent']['name']."\n";
 
@@ -350,6 +346,9 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 						
 						echo "the parent repo was NOT processed successfully\n";
 						
+						//there was a processing error with the parent repo
+						return false;
+						
 					}
 
 
@@ -379,7 +378,8 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 						return false;
 					}
 							
-					
+					//unset the $single_repo_json_object from memory
+					unset($single_repo_json_object);
 				}
 				else
 				{
@@ -637,8 +637,9 @@ function repo_request_loop($request_url, &$http_404_error, $owner_id = null, $pa
 
 				return false;
 			}
-
 			
+			//release the current $json_object array element from memory
+			$json_object[$i] = null;
 		}
 
 		echo "The repo_request_loop has finished the current iteration, check if the next_link_url is defined\n";
@@ -772,6 +773,8 @@ function reprocess_repos ()
 		return false;
 	}
 	
+	//release the stmt variable from memory:
+	unset($stmt);
 
 	echo "reprocess_repos() is finished executing\n\n";
 

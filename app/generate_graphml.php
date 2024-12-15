@@ -30,7 +30,7 @@ $graphml_content = str_replace("[EDGE_DATA]", generate_edge_data(), str_replace(
 echo "save the generated graphml file\n";
 
 //save the generated graphml file:
-file_put_contents("../graphml_output/github_forked_repo_network.".date("Ymd").".graphml", $graphml_content);
+file_put_contents("../Analysis/Networks/github_forked_repo_network.".date("Ymd").".graphml", $graphml_content);
 
 
 
@@ -43,53 +43,48 @@ function generate_vertex_data ()
 	
 	//query the database for the repos so the vertex data can be generated
 	$query = "select * from 
-	(select ghnd_parent_child_owner_repos_v.child_source_owner_id,
-	ghnd_parent_child_owner_repos_v.child_login login,
-	ghnd_parent_child_owner_repos_v.child_owner_html_url owner_html_url,
-	ghnd_parent_child_owner_repos_v.child_owner_type owner_type,
-	ghnd_parent_child_owner_repos_v.child_source_repo_id source_repo_id,
-	ghnd_parent_child_owner_repos_v.child_name repo_name,
-	ghnd_parent_child_owner_repos_v.child_full_name repo_full_name,
-	ghnd_parent_child_owner_repos_v.child_repo_html_url repo_html_url,
-	ghnd_parent_child_owner_repos_v.child_topics topics,
-	DATE_FORMAT(ghnd_parent_child_owner_repos_v.child_created_at, '%m/%d/%Y') created_at,
-	DATE_FORMAT(ghnd_parent_child_owner_repos_v.child_updated_at, '%m/%d/%Y') updated_at
-	from ghnd_parent_child_owner_repos_v
+	(select child_repos.child_source_owner_id,
+	child_repos.child_login login,
+	child_repos.child_owner_html_url owner_html_url,
+	child_repos.child_owner_type owner_type,
+	child_repos.child_source_repo_id source_repo_id,
+	child_repos.child_name repo_name,
+	child_repos.child_full_name repo_full_name,
+	child_repos.child_repo_html_url repo_html_url,
+	child_repos.child_topics topics,
+	DATE_FORMAT(child_repos.child_created_at, '%m/%d/%Y') created_at,
+	DATE_FORMAT(child_repos.child_updated_at, '%m/%d/%Y') updated_at
+	from ghnd_parent_child_owner_repos_v child_repos
 	
 	
 	WHERE 
-	/*only include repos that have been completely processed*/
-	ghnd_parent_child_owner_repos_v.child_repo_processed_yn = 1 
-	AND ghnd_parent_child_owner_repos_v.parent_repo_processed_yn = 1 
-
-	/*only include repos that have a connection to a parent repo*/
-	AND ghnd_parent_child_owner_repos_v.child_parent_repo_id IS NOT NULL
+	/*only include repos where both parent and child have been completely processed*/
+	child_repos.child_repo_processed_yn = 1 
+	AND child_repos.parent_repo_processed_yn = 1 
 	
-	/*AND ghnd_parent_child_owner_repos_v.owner_processed_yn = 1 */
-
 
 	UNION
 
 	/*include only distinct parent repos that have at least one child repo*/
 	select DISTINCT
-	ghnd_parent_child_owner_repos_v.parent_source_owner_id source_owner_id,
-	ghnd_parent_child_owner_repos_v.parent_login login,
-	ghnd_parent_child_owner_repos_v.parent_owner_html_url owner_html_url,
-	ghnd_parent_child_owner_repos_v.parent_owner_type owner_type,
-	ghnd_parent_child_owner_repos_v.parent_source_repo_id source_repo_id,
-	ghnd_parent_child_owner_repos_v.parent_name repo_name,
-	ghnd_parent_child_owner_repos_v.parent_full_name repo_full_name,
-	ghnd_parent_child_owner_repos_v.parent_repo_html_url repo_html_url,
-	ghnd_parent_child_owner_repos_v.parent_topics topics,
-	DATE_FORMAT(ghnd_parent_child_owner_repos_v.parent_created_at, '%m/%d/%Y') created_at,
-	DATE_FORMAT(ghnd_parent_child_owner_repos_v.parent_updated_at, '%m/%d/%Y') updated_at
+	parent_repos.parent_source_owner_id source_owner_id,
+	parent_repos.parent_login login,
+	parent_repos.parent_owner_html_url owner_html_url,
+	parent_repos.parent_owner_type owner_type,
+	parent_repos.parent_source_repo_id source_repo_id,
+	parent_repos.parent_name repo_name,
+	parent_repos.parent_full_name repo_full_name,
+	parent_repos.parent_repo_html_url repo_html_url,
+	parent_repos.parent_topics topics,
+	DATE_FORMAT(parent_repos.parent_created_at, '%m/%d/%Y') created_at,
+	DATE_FORMAT(parent_repos.parent_updated_at, '%m/%d/%Y') updated_at
 	from
-	ghnd_parent_child_owner_repos_v 
+	ghnd_parent_child_owner_repos_v parent_repos 
 	
 	where 
-	ghnd_parent_child_owner_repos_v.child_repo_processed_yn = 1
-	AND ghnd_parent_child_owner_repos_v.parent_repo_processed_yn = 1
-	) child_parent_repos
+	parent_repos.child_repo_processed_yn = 1
+	AND parent_repos.parent_repo_processed_yn = 1
+	) processed_parent_child_repos
 
 	ORDER BY login,
 	repo_name";

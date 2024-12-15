@@ -85,6 +85,17 @@ compare to random models
 look at domain explanations for why it differs from degree distribution random models
 
 
+R:
+	look at the histogram for the degree distribution
+	_ document the method for gathering the data and where each source of data is from
+		
+		isolates are filtered out of the graph export
+		May even want to remove the pairs of repos that only have one link between them and nothing else references either nodes (isolated couples?)
+
+	potentially remove the 
+
+
+
 
 Use RMarkdown, Gephi for the paper
 	Do we need to use Word/Google Docs?
@@ -113,10 +124,22 @@ Primary School Contacts.Rmd: (43:00) 12/12/24 video
 
 
 
-_ do we want to commit owners/repos even if they weren't successfully processed?
+X do we want to commit owners/repos even if they weren't successfully processed? YES
 	having a processed_yn = 0 will still have the object reprocessed
 
 
+
+To do:
+	X update the graphml query to filter out the repos that are not connected to another repo or repos that are connected to by another repo
+		we want all parent repos that are processed
+			select parent_repos.* from ghnd_parent_child_owner_repos_v where parent_repo_id IS NOT NULL AND parent_repo_processed_yn = 1 AND child_repo_processed_yn = 1
+		
+		
+		we want all child repos that are processed
+			select child_repos.* from ghnd_parent_child_owner_repos_v where child_parent_repo_id IS NOT NULL AND parent_repo_processed_yn = 1 AND child_repo_processed_yn = 1
+	
+	
+	
 
 
 _ process_repo()
