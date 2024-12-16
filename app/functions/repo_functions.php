@@ -354,32 +354,45 @@ function process_repo (&$repo_info, &$repo_id, $owner_id = null, $parent_repo_id
 
 					//***the owner of a forked repository is an interesting node, check for all repositories for the owner now that the owner record exists
 					
-
-
-					//initialize the parent owner repo 404 error variable that is passed by reference to the repo_request_loop() function
-					$parent_owner_repo_404_http_error = false;
-					
-					echo "recursively process all of the parent repo's owner's (".$single_repo_json_object['parent']['owner']['login'].") repos\n";
-					
-					//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
-					if (repo_request_loop ($single_repo_json_object['parent']['owner']['repos_url']."?per_page=100", $parent_owner_repo_404_http_error, $parent_owner_id))
+					echo "check if the parent owner (".$single_repo_json_object['parent']['owner']['login'].") has already started or finished processing\n";
+					//check if the parent owner has already started or finished processing:
+					if (owner_processed($single_repo_json_object['parent']['owner']))
 					{
-						//the parent repo's owner repo request loop was successful
-						echo "the parent repo's owner repo request loop was successful\n";
+						//the parent owner has already started or finished processing, do nothing
+						echo "the parent owner (".$single_repo_json_object['parent']['owner']['login'].") has already started or finished processing, do nothing\n";
+						
 					}
 					else
 					{
-						//the parent owner repo_request_loop failed
+						//the parent owner has not already started or finished processing, process the current owner using the repo_request_loop() function
+						echo "the parent owner (".$single_repo_json_object['parent']['owner']['login'].") has not already started or finished processing, process the current owner using the repo_request_loop() function\n";
 						
-						echo "the parent repo's owner (".$single_repo_json_object['parent']['owner']['login'].") repo request loop was NOT successful\n";
+
+						//initialize the parent owner repo 404 error variable that is passed by reference to the repo_request_loop() function
+						$parent_owner_repo_404_http_error = false;
 						
-					
-						//the app had a database error, return false to indicate the function call failed
-						return false;
-					}
+						echo "recursively process all of the parent repo's owner's (".$single_repo_json_object['parent']['owner']['login'].") repos\n";
+						
+						//use the repos_url property of the parent repo's owner to construct a request for the repos for the parent repo's owner
+						if (repo_request_loop ($single_repo_json_object['parent']['owner']['repos_url']."?per_page=100", $parent_owner_repo_404_http_error, $parent_owner_id))
+						{
+							//the parent repo's owner repo request loop was successful
+							echo "the parent repo's owner repo request loop was successful\n";
+						}
+						else
+						{
+							//the parent owner repo_request_loop failed
 							
-					//unset the $single_repo_json_object from memory
-					unset($single_repo_json_object);
+							echo "the parent repo's owner (".$single_repo_json_object['parent']['owner']['login'].") repo request loop was NOT successful\n";
+							
+						
+							//the app had a database error, return false to indicate the function call failed
+							return false;
+						}
+								
+						//unset the $single_repo_json_object from memory
+						unset($single_repo_json_object);
+					}
 				}
 				else
 				{

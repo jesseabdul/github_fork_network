@@ -28,16 +28,6 @@ connect_mysql ($pdo);
 $GLOBALS['pdo']->beginTransaction();
 
 
-echo "reprocess all repos that have not been marked as successfully processed repo_processed_yn = 1\n";
-if (reprocess_repos())
-{
-	echo "the unprocessed repos have all been successfully processed\n";
-}
-else
-{
-	echo "one or more unprocessed repos have not been successfully processed\n";
-}
-
 echo "reprocess all owners that have not been marked as successfully processed owner_processed_yn = 1\n";
 if (reprocess_owners())
 {
@@ -46,6 +36,17 @@ if (reprocess_owners())
 else
 {
 	echo "one or more unprocessed owners have not been successfully processed\n";
+}
+
+
+echo "reprocess all repos that have not been marked as successfully processed repo_processed_yn = 1\n";
+if (reprocess_repos())
+{
+	echo "the unprocessed repos have all been successfully processed\n";
+}
+else
+{
+	echo "one or more unprocessed repos have not been successfully processed\n";
 }
 
 

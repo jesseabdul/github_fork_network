@@ -271,20 +271,10 @@ repo_summ_v.login,
 repo_summ_v.owner_html_url, 
 repo_summ_v.owner_type, 
 repo_summ_v.owner_processed_yn, 
-repo_summ_v.repo_id,
-repo_summ_v.source_repo_id,
-repo_summ_v.parent_repo_id,
-repo_summ_v.name, 
-repo_summ_v.full_name,
-repo_summ_v.repo_html_url, 
-repo_summ_v.topics, 
-repo_summ_v.created_at,
-repo_summ_v.updated_at, 
-repo_summ_v.repo_processed_yn,
-
+count(*) num_repos,
 SUM(repo_summ_v.in_degree) owner_in_degree,
-repo_summ_v.child_repo_processed_count,
-repo_summ_v.child_repo_unprocessed_count,
+SUM(repo_summ_v.child_repo_processed_count) child_repo_processed_count,
+SUM(repo_summ_v.child_repo_unprocessed_count) child_repo_unprocessed_count,
 SUM(repo_summ_v.out_degree) owner_out_degree
 from 
 
@@ -297,17 +287,7 @@ repo_summ_v.source_owner_id,
 repo_summ_v.login, 
 repo_summ_v.owner_html_url, 
 repo_summ_v.owner_type, 
-repo_summ_v.owner_processed_yn, 
-repo_summ_v.repo_id,
-repo_summ_v.source_repo_id,
-repo_summ_v.parent_repo_id,
-repo_summ_v.name, 
-repo_summ_v.full_name,
-repo_summ_v.repo_html_url, 
-repo_summ_v.topics, 
-repo_summ_v.created_at,
-repo_summ_v.updated_at, 
-repo_summ_v.repo_processed_yn
+repo_summ_v.owner_processed_yn
 order by 
 repo_summ_v.owner_type, 
 repo_summ_v.login
