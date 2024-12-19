@@ -1,0 +1,91 @@
+---
+title: "GitHub Repository Fork Network Communities"
+author: "Jesse Abdul"
+date: "12/21/2024"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+  html_notebook: 
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_chunk$set(echo = TRUE) # Display code in the output document
+opts_chunk$set(comment="")  # Get rid of ## on output knit to html. 
+library(tibble) # Import first so it does not mask igraph simplify
+library(igraph)
+library(linkcomm)
+library(jpeg) 
+library(png)
+library(moments) # install this package to compute 2nd moment easily 
+source("Utility/reify_link_communities.R")
+source("Utility/degree_domain.R")
+source("Utility/nonzero_degree_distribution.R")
+source("Utility/top_n_vertices.R")
+```
+
+____________________________________________________________
+### Introduction 
+
+
+
+```{r}
+GFN <- read_graph("Networks/github_forked_repo_network.graphml", format="graphml")
+GFN$name <- "GitHub Repository Fork Network"
+
+V(GFN)$in_degree <- degree(GFN, mode="in")
+V(GFN)$out_degree <- degree(GFN, mode="out")
+V(GFN)$global_transitivity <- transitivity(GFN, type="global")
+V(GFN)$page_rank <- page_rank(GFN)$vector
+GFN$Mean_In_Degree = mean(V(GFN)$in_degree)
+GFN$Mean_Out_Degree = mean(V(GFN)$out_degree)
+
+summary(GFN)
+
+```
+
+
+
+
+```{r}
+# display a histogram of the degree distribution
+plot(degree_domain(GFN), nonzero_degree_distribution(GFN, mode="in"), main="GitHub Repository Fork Network In-Degree Distribution", xlab="k", ylab="p(k)", log="xy"  )
+
+legend("topright", 
+       legend= c(paste("k-min =", min(V(GFN)$in_degree)), paste("<k> =", round(moment(V(GFN)$in_degree, order=1), 4)), paste("<k^2> =", round(moment(V(GFN)$in_degree, order=2), 4)), paste("k-max =", max(V(GFN)$in_degree))), bty="n", cex=1.0)
+
+```
+**Discussion**
+This is a heavy tailed distribution shown by the plot
+
+_ try to fit a curve to it (power law)
+
+```{r}
+write_graph(GFN, "Networks/github_forked_repo_network_annotated.graphml", format="graphml")
+
+```
+
+
+
+
+
+
+```{r}
+
+
+
+```
+
+
+
+
+
+
+
+tibble(in_degree= topnv(GFN, V()),
+label = )
+
+)

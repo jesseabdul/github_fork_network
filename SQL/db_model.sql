@@ -372,3 +372,109 @@ select
 SUM(CASE WHEN ghnd_owners.owner_processed_yn = 1 THEN 1 ELSE 0 END) processed_owners,
 SUM(CASE WHEN ghnd_owners.owner_processed_yn = 0 THEN 1 ELSE 0 END) unprocessed_owners
 from ghnd_owners;
+
+
+
+
+/*recursive query to get the highest level parent and the distance between the given repo and it's highest level parent*/
+
+create or replace view
+ghnd_parent_child_generations_v
+
+as
+WITH RECURSIVE ParentHierarchy AS (
+    -- Base case: select all root nodes (parent_repo_id is NULL)
+    SELECT repo_id, parent_repo_id, 0 AS distance, repo_id AS highest_parent_repo_id
+    FROM ghnd_repos
+    WHERE parent_repo_id IS NULL
+    
+    UNION ALL
+    
+    -- Recursive case: for each child node, calculate the distance to its parent
+    SELECT n.repo_id, n.parent_repo_id, ph.distance + 1 AS distance, ph.highest_parent_repo_id
+    FROM ghnd_repos n
+    JOIN ParentHierarchy ph ON n.parent_repo_id = ph.repo_id
+)
+-- Now we can select the final distances for each node to its highest-level parent (root)
+SELECT repo_id, parent_repo_id, distance, highest_parent_repo_id
+FROM ParentHierarchy where distance > 0;
+
+
+
+
+
+
+
+/*attempt to get the child nodes with the highest distance between them and a parent node*/
+
+
+/*use this query to annotate the graph*/
+
+create or replace view
+ghnd_parent_child_max_generation_v
+
+as
+select 
+ph.repo_id, ph.parent_repo_id, ph.distance, ph.highest_parent_repo_id
+
+from 
+ghnd_parent_child_generations_v ph inner join 
+
+(
+select max(max_dist_summ_repos.distance) max_distance, max_dist_summ_repos.repo_id from 
+
+ghnd_parent_child_generations_v max_dist_summ_repos
+group by max_dist_summ_repos.repo_id
+
+) max_dist_child_repos
+on max_dist_child_repos.repo_id = ph.repo_id
+AND max_dist_child_repos.max_distance = ph.distance;
+
+
+
+
+
+/*old temp queries:*/
+/*WITH RECURSIVE ParentHierarchy AS (
+    -- Base case: select all root nodes (parent_repo_id is NULL)
+    SELECT repo_id, parent_repo_id, 0 AS distance
+    FROM nodes
+    WHERE parent_repo_id IS NULL
+    
+    UNION ALL
+    
+    -- Recursive case: for each child node, calculate the distance to its parent
+    SELECT n.repo_id, n.parent_repo_id, ph.distance + 1 AS distance
+    FROM nodes n
+    JOIN ParentHierarchy ph ON n.parent_repo_id = ph.repo_id
+)
+-- Now we can select the final distances for each node to its highest-level parent (root)
+SELECT repo_id, parent_repo_id, distance
+FROM ParentHierarchy where distance > 0;
+
+
+
+
+
+
+
+
+
+WITH RECURSIVE Generations AS (
+    -- Start with each record, initializing generation as 0
+    SELECT repo_id, full_name, parent_repo_id, 0 AS generation
+    FROM ghnd_repos
+    WHERE parent_repo_id IS NULL   -- Root records (generation 0)
+
+    UNION ALL
+
+    -- Recursively join each record with its parent and increment the generation count
+    SELECT i.repo_id, i.full_name, i.parent_repo_id, g.generation + 1 AS generation
+    FROM ghnd_repos i
+    JOIN Generations g ON g.parent_repo_id = i.repo_id
+)
+-- Select the final generation count for every record
+SELECT repo_id, full_name, generation
+FROM Generations 
+ORDER BY repo_id;
+*/
