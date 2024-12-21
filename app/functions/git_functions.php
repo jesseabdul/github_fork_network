@@ -41,7 +41,7 @@ function curl_request($url, &$json_object, &$next_link_url, &$http_code, $reques
 		
 //		echo "The value of \$curl_response is: ".$curl_response."\n";
 
-		file_put_contents($GLOBALS['debug_path'].$request_id.".txt", $curl_response);
+//		file_put_contents($GLOBALS['debug_path'].$request_id.".txt", $curl_response);
 		
 		if ($return_value = parse_json_from_api ($curl_response, $json_object, $next_link_url))
 		{

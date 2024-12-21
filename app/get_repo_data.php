@@ -15,7 +15,7 @@ $org_loop_counter = 0;
 //initialize the loop counter variable for repos
 $repo_loop_counter = 0;
 
-$debug_path = "L:/Documents/Version Control/network_science_data_gathering/app/debug/";
+//$debug_path = $current_dir."./debug/";
 
 //connect to mysql with PDO
 connect_mysql ($pdo);
