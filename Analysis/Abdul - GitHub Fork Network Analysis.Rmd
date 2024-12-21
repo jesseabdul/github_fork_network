@@ -33,7 +33,7 @@ ____________________________________________________________
 
 
 ```{r}
-GFN <- read_graph("Networks/github_forked_repo_network.graphml", format="graphml")
+GFN <- read_graph("Networks/github_forked_repo_network.20241220.graphml", format="graphml")
 GFN$name <- "GitHub Repository Fork Network"
 
 V(GFN)$in_degree <- degree(GFN, mode="in")
@@ -42,8 +42,26 @@ V(GFN)$global_transitivity <- transitivity(GFN, type="global")
 V(GFN)$page_rank <- page_rank(GFN)$vector
 GFN$Mean_In_Degree = mean(V(GFN)$in_degree)
 GFN$Mean_Out_Degree = mean(V(GFN)$out_degree)
+E(GFN)$weight = 1;
 
 summary(GFN)
+
+```
+
+**Find the top actors for each metric**
+
+```{r}
+
+tibble(
+  In_Degree = top_n_vertices(GFN, V(GFN)$in_degree, 30)$repo_full_name,
+  In_Degree_Value = top_n_vertices(GFN, V(GFN)$in_degree, 30)$in_degree,
+  Fork_Depth = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$repo_full_name,
+  Fork_Depth_Parent = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$fork_depth_parent,
+  Fork_Depth_Value = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$fork_depth
+  
+  
+)
+
 
 ```
 
@@ -70,22 +88,30 @@ write_graph(GFN, "Networks/github_forked_repo_network_annotated.graphml", format
 
 
 
-
-
+**Contract the graph**
 
 ```{r}
+# contract the graph using the mapping between country label and numeric values:
+GFN_owner <- contract(GFN, as.numeric(as.factor(V(GFN)$owner_login)))
 
+# simplify the modified graph to remove self loops and combine the multiple edges between nodes and set the value of each edge weight to the sum of the original edge weights: 
+GFN_owner <- simplify(GFN_owner, edge.attr.comb = list(weight = sum))
 
+# Then annotate the graph: 
+V(GFN_owner)$owner_login  <- sort(unique(V(GFN)$owner_login))
+V(GFN_owner)$repo_count <- as.vector(table(V(GFN)$owner_login)) 
+V(GFN_owner)$in_degree <- degree(GFN_owner, mode="in")
+V(GFN_owner)$out_degree <- degree(GFN_owner, mode="out")
+V(GFN_owner)$global_transitivity <- transitivity(GFN_owner, type="global")
+V(GFN_owner)$page_rank <- page_rank(GFN_owner)$vector
+
+GFN_owner$name <- "GitHub Repository Owner Fork Network"
+
+summary(GFN_owner) # of simplified network: 
+
+# write the simplified graph:
+write_graph(GFN_owner, "Networks/github_forked_owner_repo_network_annotated.graphml", format="graphml")
 
 ```
 
 
-
-
-
-
-
-tibble(in_degree= topnv(GFN, V()),
-label = )
-
-)

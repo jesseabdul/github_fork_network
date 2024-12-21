@@ -1,4 +1,4 @@
-# GitHub repositories Fork Network Data System
+# GitHub Repositories Fork Network Data System
 
 ## Overview
 This project was created to gather public repositories and owner information from GitHub using the REST API to construct a network of forked repositories.

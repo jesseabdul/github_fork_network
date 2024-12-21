@@ -384,20 +384,21 @@ ghnd_parent_child_generations_v
 as
 WITH RECURSIVE ParentHierarchy AS (
     -- Base case: select all root nodes (parent_repo_id is NULL)
-    SELECT repo_id, parent_repo_id, 0 AS distance, repo_id AS highest_parent_repo_id
+    SELECT repo_id, source_repo_id, parent_repo_id, 0 AS fork_depth, repo_id AS highest_parent_repo_id, source_repo_id AS highest_parent_source_repo_id,
+	full_name AS highest_parent_repo_full_name
     FROM ghnd_repos
     WHERE parent_repo_id IS NULL
     
     UNION ALL
     
     -- Recursive case: for each child node, calculate the distance to its parent
-    SELECT n.repo_id, n.parent_repo_id, ph.distance + 1 AS distance, ph.highest_parent_repo_id
+    SELECT n.repo_id, n.source_repo_id, n.parent_repo_id, ph.fork_depth + 1 AS fork_depth, ph.highest_parent_repo_id, ph.highest_parent_source_repo_id, ph.highest_parent_repo_full_name
     FROM ghnd_repos n
     JOIN ParentHierarchy ph ON n.parent_repo_id = ph.repo_id
 )
 -- Now we can select the final distances for each node to its highest-level parent (root)
-SELECT repo_id, parent_repo_id, distance, highest_parent_repo_id
-FROM ParentHierarchy where distance > 0;
+SELECT repo_id, source_repo_id, parent_repo_id, fork_depth, highest_parent_repo_id, highest_parent_source_repo_id, highest_parent_repo_full_name
+FROM ParentHierarchy;
 
 
 
@@ -410,27 +411,65 @@ FROM ParentHierarchy where distance > 0;
 
 /*use this query to annotate the graph*/
 
+/*Get the fork depth between each child node and the corresponding farthest parent node to get the fork depth for each child node*/
 create or replace view
 ghnd_parent_child_max_generation_v
 
 as
 select 
-ph.repo_id, ph.parent_repo_id, ph.distance, ph.highest_parent_repo_id
+ph.repo_id, ph.source_repo_id, ph.parent_repo_id, ph.fork_depth, ph.highest_parent_repo_id, ph.highest_parent_source_repo_id, ph.highest_parent_repo_full_name
 
 from 
 ghnd_parent_child_generations_v ph inner join 
 
 (
-select max(max_dist_summ_repos.distance) max_distance, max_dist_summ_repos.repo_id from 
+/*query for all max distances for a given repository*/
+select max(max_dist_summ_repos.fork_depth) max_distance, max_dist_summ_repos.repo_id from 
 
 ghnd_parent_child_generations_v max_dist_summ_repos
 group by max_dist_summ_repos.repo_id
 
 ) max_dist_child_repos
 on max_dist_child_repos.repo_id = ph.repo_id
-AND max_dist_child_repos.max_distance = ph.distance;
+AND max_dist_child_repos.max_distance = ph.fork_depth;
 
 
+
+
+/*
+identify all of the isolated pairs of repos so they can be filtered out:
+*/
+select 
+ghnd_parent_child_owner_repos_v.child_parent_repo_id,
+ghnd_parent_child_owner_repos_v.child_repo_id,
+ghnd_parent_child_owner_repos_v.child_login,
+ghnd_parent_child_owner_repos_v.child_name,
+ghnd_parent_child_owner_repos_v.parent_repo_id,
+ghnd_parent_child_owner_repos_v.parent_login,
+ghnd_parent_child_owner_repos_v.parent_name,
+ghnd_parent_child_owner_repos_v.parent_parent_repo_id
+
+
+from
+ghnd_parent_child_owner_repos_v
+left join 
+(select count(*) child_count, parent_repo_id from
+ghnd_repos group by 
+parent_repo_id
+) child_rec_count 
+on child_rec_count.parent_repo_id = ghnd_parent_child_owner_repos_v.parent_repo_id
+
+
+
+WHERE 
+/*filter out records where the parent repository references another repository*/
+ghnd_parent_child_owner_repos_v.parent_parent_repo_id IS NULL
+
+AND child_rec_count.child_count = 1
+
+/*filter out any repositories where the child repository is referenced by another repository*/
+AND NOT EXISTS(select 1 from ghnd_repos where ghnd_parent_child_owner_repos_v.child_repo_id = ghnd_repos.parent_repo_id)
+;
 
 
 
