@@ -120,6 +120,7 @@ ghnd_parent_child_max_generation_v.highest_parent_repo_full_name
   <data key=\"v_repo_full_name\">".$db_info['repo_full_name']."</data>
   <data key=\"v_repo_created_at\">".$db_info['created_at']."</data>
   <data key=\"v_repo_updated_at\">".$db_info['updated_at']."</data>
+  <data key=\"v_owner_id\">".$db_info['source_owner_id']."</data>
   <data key=\"v_owner_login\">".$db_info['login']."</data>
   <data key=\"v_owner_html\">".$db_info['owner_html_url']."</data>
   <data key=\"v_owner_type\">".$db_info['owner_type']."</data>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
+         http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="g_name" for="graph" attr.name="name" attr.type="string"/>
+  <key id="g_generated_date" for="graph" attr.name="generated_date" attr.type="string"/>
+  <key id="v_label" for="node" attr.name="label" attr.type="string"/>
+  <key id="v_id" for="node" attr.name="repo_id" attr.type="string"/>
+  <key id="v_repo_html" for="node" attr.name="repo_html" attr.type="string"/>
+  <key id="v_repo_name" for="node" attr.name="repo_name" attr.type="string"/>
+  <key id="v_repo_full_name" for="node" attr.name="repo_full_name" attr.type="string"/>
+  <key id="v_repo_created_at" for="node" attr.name="created" attr.type="string"/>
+  <key id="v_repo_updated_at" for="node" attr.name="updated" attr.type="string"/>
+  <key id="v_owner_id" for="node" attr.name="owner_id" attr.type="double"/>
+  <key id="v_owner_login" for="node" attr.name="owner_login" attr.type="string"/>
+  <key id="v_owner_html" for="node" attr.name="owner_html" attr.type="string"/>
+  <key id="v_owner_type" for="node" attr.name="owner_type" attr.type="string"/>
+  <key id="v_fork_depth" for="node" attr.name="fork_depth" attr.type="double"/>
+  <key id="v_fork_depth_parent" for="node" attr.name="fork_depth_parent" attr.type="string"/>
+  <graph id="G" edgedefault="directed">
+    <data key="g_name">GitHub Forked Repository Network</data>
+    <data key="g_generated_date">[GEN_DATE]</data>
+[VERTEX_DATA][EDGE_DATA]
+  </graph>
+</graphml>
