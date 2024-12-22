@@ -16,6 +16,7 @@
 
 nonzero_degree_distribution <- function(g, mode="all") {
   dd <- degree_distribution(g, mode=mode) # compute once 
+  dd <- dd[-1] # remove the first element that corresponds to the zero value in the degree_domain()
   return(ifelse(dd == 0.0, NA, dd))
 }
 
