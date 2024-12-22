@@ -162,7 +162,7 @@ tibble(
 **Plot the in-degree distribution**
 ```{r}
 # display a histogram of the degree distribution
-plot(degree_domain(GFN, "in"), nonzero_degree_distribution(GFN, "in"), main="GitHub Repository Fork Network In-Degree Distribution", xlab="in-degree", ylab="p(in-degree)", log="xy"  )
+plot(degree_domain(GFN, "in"), nonzero_degree_distribution(GFN, "in"), main="GitHub Fork Network In-Degree Distribution", xlab="k", ylab="p(k)", log="xy"  )
 
 legend("topright", 
        legend= c(paste("k-min =", min(V(GFN)$in_degree)), paste("<k> =", round(moment(V(GFN)$in_degree, order=1), 4)), paste("<k^2> =", round(moment(V(GFN)$in_degree, order=2), 4)), paste("k-max =", max(V(GFN)$in_degree))), bty="n", cex=1.0)
