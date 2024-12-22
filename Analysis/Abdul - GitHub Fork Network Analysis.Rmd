@@ -1,0 +1,176 @@
+---
+title: "GitHub Repository Fork Network"
+author: "Jesse Abdul"
+date: "12/21/2024"
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+  html_notebook: 
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+require("knitr")
+opts_chunk$set(echo = TRUE) # Display code in the output document
+opts_chunk$set(comment="")  # Get rid of ## on output knit to html. 
+library(tibble) # Import first so it does not mask igraph simplify
+library(igraph)
+library(jpeg) 
+library(png)
+library(moments) # install this package to compute 2nd moment easily 
+source("Utility/reify_link_communities.R")
+source("Utility/degree_domain.R")
+source("Utility/nonzero_degree_distribution.R")
+source("Utility/top_n_vertices.R")
+```
+
+____________________________________________________________
+**Read in the generated network graph and calculate metrics to annotate the graph**
+```{r}
+GFN <- read_graph("Networks/github_forked_repo_network.graphml", format="graphml")
+GFN$name <- "GitHub Repository Fork Network"
+
+V(GFN)$in_degree <- degree(GFN, mode="in")
+V(GFN)$out_degree <- degree(GFN, mode="out")
+V(GFN)$page_rank <- page_rank(GFN)$vector
+V(GFN)$betweenness <- betweenness(GFN, normalized=TRUE)
+V(GFN)$harmonic_centrality  <- harmonic_centrality(GFN, normalized=TRUE)
+
+
+# calculate graph-level metrics
+GFN$global_transitivity <- transitivity(GFN, type="global")
+GFN$diameter <- diameter(GFN)
+
+# calculate the louvain communities using the modularity metric (use a temporarily generated undirected graph)
+V(GFN)$comm_louvain <- membership(cluster_louvain(as_undirected(GFN, mode="collapse")))
+
+# calculate the infomap communities using the modularity metric
+V(GFN)$comm_infomap <- membership(cluster_infomap(GFN))
+
+# disconnected graph, so assortativity is NaN
+# GFN$deg_assortativity <- assortativity_degree(GFN)
+GFN$owner_type_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$owner_type))
+GFN$in_degree_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$in_degree))
+GFN$out_degree_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$out_degree))
+GFN$betweenness_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$betweenness))
+GFN$page_rank_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$page_rank))
+GFN$harmonic_centrality_assortativity <- assortativity_nominal(GFN, types=as.factor(V(GFN)$harmonic_centrality))
+
+
+GFN$mean_in_degree = mean(V(GFN)$in_degree)
+GFN$mean_out_degree = mean(V(GFN)$out_degree)
+E(GFN)$weight = 1;
+
+summary(GFN)
+
+```
+
+
+
+**Show the graph-level metrics**
+```{r}
+tibble(
+  global_transitivity = GFN$global_transitivity,
+  diameter = GFN$diameter,
+  mean_in_degree = GFN$mean_in_degree,
+  mean_out_degree = GFN$mean_out_degree,
+  owner_type_assortativity = GFN$owner_type_assortativity,
+  in_degree_assortativity = GFN$in_degree_assortativity,
+  out_degree_assortativity = GFN$out_degree_assortativity,
+  betweenness_assortativity = GFN$betweenness_assortativity,
+  page_rank_assortativity = GFN$page_rank_assortativity,
+  harmonic_centrality_assortativity = GFN$harmonic_centrality_assortativity
+)
+```
+
+**calculate the standard metrics used to predict regimes in random networks**
+```{r}
+GFN_degree <- degree(GFN) # compute once for efficiency and convenience 
+tibble(
+ "N = |V|" = vcount(GFN),
+ "M = |E|" = ecount(GFN),
+ "<k>"     = mean(GFN_degree),
+ "ln N"    = log(vcount(GFN)),
+ "ln N / ln <k>" = log(vcount(GFN))/log(mean(GFN_degree)),
+ "ln ln N" = log(log(vcount(GFN)))
+)
+```
+
+
+**Generate the random graphs**
+```{r}
+# completely random graph
+GFN_gnm <- sample_gnm(vcount(GFN), ecount(GFN), directed=TRUE)
+GFN_gnm$name <- paste("GFN", GFN_gnm$name)
+summary(GFN_gnm)
+
+# configuration model
+GFN_config <- sample_degseq(V(GFN)$out_degree, V(GFN)$in_degree, method="configuration")
+GFN_config$name <- paste("GFN", GFN_config$name)
+summary(GFN_config)
+
+# degree preserving randomization
+GFN_rewire <- rewire(GFN, keeping_degseq(loops=FALSE, niter=100*ecount(GFN)))
+GFN_rewire$name <- "GFN Rewired"
+summary(GFN_rewire)
+
+```
+
+**compare the natural network to comparable random networks**
+```{r}
+GFN_models <- list(GFN, GFN_gnm, GFN_config, GFN_rewire) # must list not c
+tibble(
+Model         = c("GitHub Fork Network", "G(n,m)", "Config", "Rewire"), 
+ strong_components    = sapply(GFN_models, count_components, mode="strong"), # Number of strong components
+ weak_components    = sapply(GFN_models, count_components, mode="weak"), # Number of weak components
+ percent_giant = sapply(sapply(GFN_models, largest_component), vcount)/sapply(GFN_models, vcount), # Percent in giant component 
+ meandist      = sapply(GFN_models, mean_distance, directed=TRUE), # Mean distance 
+ transitivity  = sapply(GFN_models, transitivity, type="global"), # Global transitivity  
+ degreeassort  = sapply(GFN_models, assortativity_degree, directed=TRUE), # Degree assortativity 
+reciprocity    = sapply(GFN_models, reciprocity, mode="default")
+)
+```
+
+
+
+**Show the top N vertices in each vertex metric **
+```{r}
+
+tibble(
+  In_Degree = top_n_vertices(GFN, V(GFN)$in_degree, 30)$repo_full_name,
+  In_Degree_Value = top_n_vertices(GFN, V(GFN)$in_degree, 30)$in_degree,
+  Fork_Depth = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$repo_full_name,
+  Fork_Depth_Parent = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$fork_depth_parent,
+  Fork_Depth_Value = top_n_vertices(GFN, V(GFN)$fork_depth, 30)$fork_depth,
+  Betweenness = top_n_vertices(GFN, V(GFN)$betweenness, 30)$repo_full_name,
+  Betweenness_Value = top_n_vertices(GFN, V(GFN)$betweenness, 30)$betweenness,
+  Page_Rank = top_n_vertices(GFN, V(GFN)$page_rank, 30)$repo_full_name,
+  Page_Rank_Value = top_n_vertices(GFN, V(GFN)$page_rank, 30)$page_rank,
+  Harmonic_Centrality = top_n_vertices(GFN, V(GFN)$harmonic_centrality, 30)$repo_full_name,
+  Harmonic_Centrality_Value = top_n_vertices(GFN, V(GFN)$harmonic_centrality, 30)$harmonic_centrality
+  
+  
+)
+
+
+```
+
+
+ 
+**Plot the in-degree distribution**
+```{r}
+# display a histogram of the degree distribution
+plot(degree_domain(GFN, "in"), nonzero_degree_distribution(GFN, "in"), main="GitHub Fork Network In-Degree Distribution", xlab="k", ylab="p(k)", log="xy"  )
+
+legend("topright", 
+       legend= c(paste("k-min =", min(V(GFN)$in_degree)), paste("<k> =", round(moment(V(GFN)$in_degree, order=1), 4)), paste("<k^2> =", round(moment(V(GFN)$in_degree, order=2), 4)), paste("k-max =", max(V(GFN)$in_degree))), bty="n", cex=1.0)
+
+
+```
+**Write the annotated github fork network graph**
+```{r}
+write_graph(GFN, "Networks/github_forked_repo_network_annotated.graphml", format="graphml")
+
+```
