@@ -47,7 +47,7 @@ This project was created to gather public repositories and owner information fro
 		-   owner_html_url (the HTML URL for the given owner within GitHub)
 		-   owner_type (the type from the GitHub API)
 		-   owner_processed_yn (flag that indicates if the owner has been successfully processed)
--   [MySQL backup file](./SQL/github_fork_network.sql)
+-   [MySQL database backup](./SQL/github_fork_network_backup)
 
 ## R Markdown Project
 -   [Abdul - GitHub Fork Network Analysis.Rmd](./Analysis/Abdul%20-%20GitHub%20Fork%20Network%20Analysis.Rmd)
