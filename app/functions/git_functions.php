@@ -123,8 +123,8 @@ function parse_json_from_api ($json_content, &$json_object, &$next_link_url)
 
 function connect_mysql (&$pdo)
 {
-	// connect to PDO
-	$pdo = new PDO("mysql:host=localhost;dbname=github_network", "github_dev", "myadm1n");
+	// connect to PDO using the corresponding PHP constant values:
+	$pdo = new PDO(DB_HOST_STRING, DB_USER, DB_PASS);
 
 	// the following tells PDO we want it to throw Exceptions for every error.
 	// this is far more useful than the default mode of throwing php errors
